@@ -162,6 +162,12 @@ public struct MainWindowView: View {
             .frame(minWidth: 220, idealWidth: 240)
         } detail: {
             VStack(spacing: 0) {
+                // Dependency missing banner / wizard
+                if !service.isSplashInstalled {
+                    DependencyInstallView(service: service)
+                        .padding(16)
+                }
+                
                 // First-launch or pending prompt to place icon in top menu bar
                 if !hasAskedAboutMenuBar {
                     menuBarPromptBanner
@@ -344,18 +350,79 @@ public struct MainWindowView: View {
             .background(Color(nsColor: .controlBackgroundColor))
             .cornerRadius(10)
             
-            // Paths & Environment
-            VStack(alignment: .leading, spacing: 8) {
-                Text(loc.isSpanish ? "Rutas del Sistema" : "System Paths")
-                    .font(.system(size: 13, weight: .semibold))
+            // Dependencies & CLI System Info
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(loc.isSpanish ? "Motor de Inferencia Splash CLI" : "Splash CLI Inference Engine")
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(service.isSplashInstalled ? Color.green : Color.orange)
+                            .frame(width: 7, height: 7)
+                        Text(service.isSplashInstalled ? (service.splashVersion ?? (loc.isSpanish ? "Instalado" : "Installed")) : (loc.isSpanish ? "No instalado" : "Not installed"))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(service.isSplashInstalled ? .green : .orange)
+                    }
+                }
                 
-                Text("Splash CLI: \(service.splashExecutablePath)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Splash CLI: \(service.splashExecutablePath)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Python Backend: \(service.splashPythonPath)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Text(loc.isSpanish ? "Directorio de Modelos: \(service.modelsDirectory.path)" : "Models Directory: \(service.modelsDirectory.path)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
                 
-                Text(loc.isSpanish ? "Directorio de Modelos: \(service.modelsDirectory.path)" : "Models Directory: \(service.modelsDirectory.path)")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.secondary)
+                Divider()
+                
+                HStack(spacing: 8) {
+                    if service.isSplashInstalled {
+                        Button {
+                            service.upgradeSplashInTerminal()
+                        } label: {
+                            Label(loc.isSpanish ? "Actualizar Splash (brew upgrade)" : "Upgrade Splash (brew upgrade)", systemImage: "arrow.up.circle")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    } else {
+                        Button {
+                            service.installSplashDependency()
+                        } label: {
+                            Label(loc.isSpanish ? "Instalar Splash (brew install)" : "Install Splash (brew install)", systemImage: "arrow.down.circle.fill")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    
+                    Button {
+                        service.checkDependencies()
+                        service.refreshInstalledModels()
+                    } label: {
+                        Label(loc.isSpanish ? "Verificar" : "Verify", systemImage: "arrow.clockwise")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    
+                    Spacer()
+                    
+                    Link(destination: URL(string: "https://github.com/incoai/splash")!) {
+                        HStack(spacing: 3) {
+                            Text("GitHub incoai/splash")
+                            Image(systemName: "arrow.up.right.square")
+                        }
+                        .font(.system(size: 10))
+                    }
+                }
             }
             .padding(14)
             .background(Color(nsColor: .controlBackgroundColor))

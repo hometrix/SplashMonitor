@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import AppKit
 
 @MainActor
 public class SplashService: ObservableObject {
@@ -14,13 +15,21 @@ public class SplashService: ObservableObject {
     @Published public var status: SplashStatus? = nil
     @Published public var lastError: String? = nil
     
+    // Dependencies & CLI state
+    @Published public var isSplashInstalled: Bool = false
+    @Published public var splashVersion: String? = nil
+    @Published public var hasHomebrew: Bool = false
+    @Published public var isInstallingDependency: Bool = false
+    @Published public var dependencyInstallLogs: [String] = []
+    @Published public var dependencyInstallSuccess: Bool? = nil
+    
     // Model lists
     @Published public var installedModels: [InstalledSplashModel] = []
     @Published public var availableOnlineModels: [HuggingFaceModelItem] = []
     @Published public var isLoadingOnlineModels: Bool = false
     @Published public var selectedModelForLaunch: String = "incoai/Qwen3.6-35B-A3B-Splash"
     
-    // Installation state
+    // Model Installation state
     @Published public var isInstalling: Bool = false
     @Published public var installingModelId: String? = nil
     @Published public var installLogs: [String] = []
@@ -33,9 +42,10 @@ public class SplashService: ObservableObject {
     @AppStorage("refreshInterval") public var refreshInterval: Double = 1.5
     @AppStorage("menuBarDisplayMode") public var menuBarDisplayMode: String = "speed" // "icon", "speed", "tokens", "model"
     
-    // Timers
+    // Timers & Processes
     private var timer: Timer?
     private var installProcess: Process?
+    private var dependencyProcess: Process?
     
     // Paths
     public let dataDirectory: URL = {
@@ -51,32 +61,81 @@ public class SplashService: ObservableObject {
         dataDirectory.appendingPathComponent("runtime/serve.lock")
     }
     
+    public var brewExecutablePath: String? {
+        let candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
+        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
+            return p
+        }
+        return nil
+    }
+    
     public var splashExecutablePath: String {
-        if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/splash") {
-            return "/opt/homebrew/bin/splash"
-        } else if FileManager.default.fileExists(atPath: "/usr/local/bin/splash") {
-            return "/usr/local/bin/splash"
+        let candidates = [
+            "/opt/homebrew/bin/splash",
+            "/usr/local/bin/splash",
+            "/opt/homebrew/opt/splash/bin/splash",
+            "/usr/local/opt/splash/bin/splash"
+        ]
+        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
+            return p
         }
         return "splash"
     }
     
     public var splashPythonPath: String {
-        let cellarPath = "/opt/homebrew/Cellar/splash/1.0/libexec/python/bin/python3"
-        if FileManager.default.fileExists(atPath: cellarPath) {
-            return cellarPath
+        let candidates = [
+            "/opt/homebrew/opt/splash/libexec/python/bin/python3",
+            "/usr/local/opt/splash/libexec/python/bin/python3",
+            "/opt/homebrew/Cellar/splash/1.0/libexec/python/bin/python3",
+            "/usr/local/Cellar/splash/1.0/libexec/python/bin/python3"
+        ]
+        for p in candidates where FileManager.default.fileExists(atPath: p) {
+            return p
+        }
+        
+        let fm = FileManager.default
+        let cellarRoots = ["/opt/homebrew/Cellar/splash", "/usr/local/Cellar/splash"]
+        for root in cellarRoots where fm.fileExists(atPath: root) {
+            if let versions = try? fm.contentsOfDirectory(atPath: root) {
+                for v in versions {
+                    let py = "\(root)/\(v)/libexec/python/bin/python3"
+                    if fm.fileExists(atPath: py) {
+                        return py
+                    }
+                }
+            }
         }
         return "/usr/bin/python3"
     }
     
     public var splashModelsScriptPath: String {
-        let scriptPath = "/opt/homebrew/Cellar/splash/1.0/libexec/install/models.py"
-        if FileManager.default.fileExists(atPath: scriptPath) {
-            return scriptPath
+        let candidates = [
+            "/opt/homebrew/opt/splash/libexec/install/models.py",
+            "/usr/local/opt/splash/libexec/install/models.py",
+            "/opt/homebrew/Cellar/splash/1.0/libexec/install/models.py",
+            "/usr/local/Cellar/splash/1.0/libexec/install/models.py"
+        ]
+        for p in candidates where FileManager.default.fileExists(atPath: p) {
+            return p
+        }
+        
+        let fm = FileManager.default
+        let cellarRoots = ["/opt/homebrew/Cellar/splash", "/usr/local/Cellar/splash"]
+        for root in cellarRoots where fm.fileExists(atPath: root) {
+            if let versions = try? fm.contentsOfDirectory(atPath: root) {
+                for v in versions {
+                    let script = "\(root)/\(v)/libexec/install/models.py"
+                    if fm.fileExists(atPath: script) {
+                        return script
+                    }
+                }
+            }
         }
         return ""
     }
     
     public init() {
+        checkDependencies()
         startPolling()
         refreshInstalledModels()
         Task {
@@ -86,6 +145,161 @@ public class SplashService: ObservableObject {
     
     deinit {
         timer?.invalidate()
+    }
+    
+    // MARK: - Dependency Management
+    
+    public func checkDependencies() {
+        self.hasHomebrew = brewExecutablePath != nil
+        let directPath = splashExecutablePath
+        let isDirectExecutable = directPath != "splash" && FileManager.default.isExecutableFile(atPath: directPath)
+        
+        if isDirectExecutable {
+            self.isSplashInstalled = true
+            // Read splash --version
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: directPath)
+            proc.arguments = ["--version"]
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                if let ver = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !ver.isEmpty {
+                    self.splashVersion = ver.replacingOccurrences(of: "splash ", with: "v")
+                } else {
+                    self.splashVersion = "v1.0"
+                }
+            } catch {
+                self.splashVersion = "v1.0"
+            }
+        } else {
+            // Check via which
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+            proc.arguments = ["splash"]
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+                self.isSplashInstalled = (proc.terminationStatus == 0)
+                self.splashVersion = self.isSplashInstalled ? "v1.0" : nil
+            } catch {
+                self.isSplashInstalled = false
+                self.splashVersion = nil
+            }
+        }
+    }
+    
+    public func installSplashDependency() {
+        guard !isInstallingDependency else { return }
+        isInstallingDependency = true
+        dependencyInstallLogs = [
+            "Iniciando instalación de la dependencia Splash...",
+            "Comando: brew install incoai/tap/splash"
+        ]
+        dependencyInstallSuccess = nil
+        
+        guard let brewPath = brewExecutablePath else {
+            dependencyInstallLogs.append("Error: No se encontró Homebrew instalado en /opt/homebrew/bin/brew o /usr/local/bin/brew.")
+            dependencyInstallLogs.append("Por favor instala Homebrew primero desde https://brew.sh")
+            isInstallingDependency = false
+            dependencyInstallSuccess = false
+            return
+        }
+        
+        Task.detached(priority: .userInitiated) {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: brewPath)
+            proc.arguments = ["install", "incoai/tap/splash"]
+            
+            var env = ProcessInfo.processInfo.environment
+            env["PATH"] = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+            proc.environment = env
+            
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            proc.standardError = pipe
+            
+            let outHandle = pipe.fileHandleForReading
+            outHandle.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                Task { @MainActor in
+                    for line in lines {
+                        self.dependencyInstallLogs.append(line)
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                self.dependencyProcess = proc
+            }
+            
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+                outHandle.readabilityHandler = nil
+                
+                let status = proc.terminationStatus
+                await MainActor.run {
+                    self.dependencyProcess = nil
+                    self.isInstallingDependency = false
+                    if status == 0 {
+                        self.dependencyInstallSuccess = true
+                        self.dependencyInstallLogs.append(" Splash se instaló correctamente.")
+                        self.checkDependencies()
+                        self.refreshInstalledModels()
+                    } else {
+                        self.dependencyInstallSuccess = false
+                        self.dependencyInstallLogs.append(" brew install finalizó con código de error \(status).")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.dependencyProcess = nil
+                    self.isInstallingDependency = false
+                    self.dependencyInstallSuccess = false
+                    self.dependencyInstallLogs.append(" Error al ejecutar el instalador: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    public func cancelDependencyInstall() {
+        dependencyProcess?.terminate()
+        dependencyProcess = nil
+        isInstallingDependency = false
+        dependencyInstallLogs.append(" Proceso de instalación cancelado.")
+    }
+    
+    public func installSplashInTerminal() {
+        let script = """
+        tell application "Terminal"
+            do script "brew install incoai/tap/splash"
+            activate
+        end tell
+        """
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+        }
+    }
+    
+    public func upgradeSplashInTerminal() {
+        let script = """
+        tell application "Terminal"
+            do script "brew update && brew upgrade splash"
+            activate
+        end tell
+        """
+        if let appleScript = NSAppleScript(source: script) {
+            var error: NSDictionary?
+            appleScript.executeAndReturnError(&error)
+        }
     }
     
     // MARK: - Polling & Status Fetching
@@ -128,6 +342,8 @@ public class SplashService: ObservableObject {
             let isAlive = kill(pid_t(pid), 0) == 0
             if !isAlive {
                 lockPid = nil
+                // Stale lock file cleanup
+                try? FileManager.default.removeItem(at: lockFileURL)
             }
         }
         
@@ -169,7 +385,7 @@ public class SplashService: ObservableObject {
                 self.status = nil
             }
         } catch {
-            // Also attempt fallback to port 8000 if 8005 failed and lock file wasn't present
+            // Fallback to port 8000 if 8005 failed and lock file wasn't present
             if lockPid == nil && activePort == 8005 {
                 await tryFallbackPort8000()
             } else {
@@ -222,7 +438,7 @@ public class SplashService: ObservableObject {
                     let repoId = "\(owner)/\(modelName)"
                     let isActive = (repoId == self.activeModel && self.isRunning)
                     
-                    // Calculate size
+                    // Calculate real size resolving symlinks
                     let size = calculateDirectorySize(url: modelURL)
                     
                     results.append(InstalledSplashModel(
@@ -249,16 +465,47 @@ public class SplashService: ObservableObject {
     private func calculateDirectorySize(url: URL) -> Int64 {
         let fm = FileManager.default
         var total: Int64 = 0
-        guard let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey]) else {
+        let resolvedRoot = url.resolvingSymlinksInPath()
+        
+        guard let enumerator = fm.enumerator(at: resolvedRoot, includingPropertiesForKeys: [.fileSizeKey]) else {
             return 0
         }
         for case let fileURL as URL in enumerator {
-            if let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey]),
-               values.isRegularFile == true {
-                total += Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? 0)
+            let resolved = fileURL.resolvingSymlinksInPath()
+            if let attrs = try? fm.attributesOfItem(atPath: resolved.path),
+               let size = attrs[.size] as? Int64 {
+                total += size
             }
         }
         return total
+    }
+    
+    public func deleteModel(repoId: String) {
+        let symlinkURL = modelsDirectory.appendingPathComponent(repoId)
+        let fm = FileManager.default
+        do {
+            if repoId == activeModel && isRunning {
+                stopServer()
+            }
+            if fm.fileExists(atPath: symlinkURL.path) {
+                try fm.removeItem(at: symlinkURL)
+            }
+            refreshInstalledModels()
+        } catch {
+            print("Error deleting model symlink \(repoId): \(error)")
+        }
+    }
+    
+    public func openModelInFinder(repoId: String) {
+        let symlinkURL = modelsDirectory.appendingPathComponent(repoId)
+        let resolved = symlinkURL.resolvingSymlinksInPath()
+        if FileManager.default.fileExists(atPath: resolved.path) {
+            NSWorkspace.shared.selectFile(resolved.path, inFileViewerRootedAtPath: "")
+        } else if FileManager.default.fileExists(atPath: symlinkURL.path) {
+            NSWorkspace.shared.selectFile(symlinkURL.path, inFileViewerRootedAtPath: "")
+        } else {
+            NSWorkspace.shared.open(modelsDirectory)
+        }
     }
     
     // MARK: - Online Models Catalog (Hugging Face)
@@ -272,7 +519,6 @@ public class SplashService: ObservableObject {
             if let (data, _) = try? await URLSession.shared.data(from: incoUrl),
                let items = try? JSONDecoder().decode([HuggingFaceModelItem].self, from: data) {
                 for item in items {
-                    // Filter models that are Splash packages (end with -Splash or tagged splash)
                     if item.id.hasSuffix("-Splash") || (item.tags?.contains("splash") ?? false) {
                         allItems[item.id] = item
                     }
@@ -311,13 +557,15 @@ public class SplashService: ObservableObject {
         installLogs = ["Iniciando descarga y preparación para \(repoId)..."]
         installSuccess = nil
         
+        let modelsPath = modelsDirectory.path
+        let scriptPath = splashModelsScriptPath
+        let pythonPath = splashPythonPath
+        
         Task.detached(priority: .userInitiated) {
-            let scriptPath = await self.splashModelsScriptPath
-            let pythonPath = await self.splashPythonPath
-            
             guard !scriptPath.isEmpty, FileManager.default.fileExists(atPath: scriptPath) else {
                 await MainActor.run {
-                    self.installLogs.append("Error: No se encontró script de instalación en \(scriptPath)")
+                    self.installLogs.append("Error: No se encontró script de instalación en \(scriptPath).")
+                    self.installLogs.append("Asegúrate de que Splash esté instalado vía: brew install incoai/tap/splash")
                     self.isInstalling = false
                     self.installSuccess = false
                 }
@@ -326,7 +574,7 @@ public class SplashService: ObservableObject {
             
             let process = Process()
             process.executableURL = URL(fileURLWithPath: pythonPath)
-            process.arguments = ["-u", scriptPath, "--model", repoId, "prepare"]
+            process.arguments = ["-u", scriptPath, "--models", modelsPath, "--model", repoId, "prepare"]
             
             let pipe = Pipe()
             process.standardOutput = pipe
@@ -344,6 +592,10 @@ public class SplashService: ObservableObject {
                 }
             }
             
+            await MainActor.run {
+                self.installProcess = process
+            }
+            
             do {
                 try process.run()
                 process.waitUntilExit()
@@ -351,6 +603,7 @@ public class SplashService: ObservableObject {
                 
                 let success = process.terminationStatus == 0
                 await MainActor.run {
+                    self.installProcess = nil
                     self.isInstalling = false
                     self.installSuccess = success
                     if success {
@@ -362,6 +615,7 @@ public class SplashService: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
+                    self.installProcess = nil
                     self.isInstalling = false
                     self.installSuccess = false
                     self.installLogs.append(" Error ejecutando proceso: \(error.localizedDescription)")
@@ -370,40 +624,81 @@ public class SplashService: ObservableObject {
         }
     }
     
+    public func cancelModelInstall() {
+        installProcess?.terminate()
+        installProcess = nil
+        isInstalling = false
+        installSuccess = false
+        installLogs.append(" Descarga cancelada por el usuario.")
+    }
+    
     // MARK: - Server Control
     
     public func stopServer() {
-        guard let pid = activePid, pid > 0 else { return }
-        kill(pid_t(pid), SIGTERM)
-        Task {
-            try? await Task.sleep(nanoseconds: 800_000_000)
-            await checkServerStatus()
+        if let pid = activePid, pid > 0 {
+            // Send SIGINT first for graceful exit (Splash recommended)
+            kill(pid_t(pid), SIGINT)
+            
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                if kill(pid_t(pid), 0) == 0 {
+                    kill(pid_t(pid), SIGTERM)
+                }
+                Task { @MainActor [weak self] in
+                    self?.cleanupLockAndProcess()
+                }
+            }
+        } else {
+            cleanupLockAndProcess()
         }
     }
     
-    public func startServer(model: String, port: Int = 8005) {
-        stopServer()
+    private func cleanupLockAndProcess() {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        proc.arguments = ["-f", "splash serve"]
+        try? proc.run()
+        proc.waitUntilExit()
         
-        let splashPath = splashExecutablePath
-        let script = """
-        tell application "Terminal"
-            do script "\(splashPath) serve --model \(model) --port \(port)"
-            activate
-        end tell
-        """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-            if let error = error {
-                print("AppleScript error starting server: \(error)")
-            }
+        if FileManager.default.fileExists(atPath: lockFileURL.path) {
+            try? FileManager.default.removeItem(at: lockFileURL)
+        }
+        self.isRunning = false
+        self.status = nil
+        self.activePid = nil
+    }
+    
+    public func startServer(model: String, port: Int = 8005) {
+        guard isSplashInstalled else {
+            installSplashDependency()
+            return
         }
         
-        Task {
-            for _ in 0..<10 {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                await checkServerStatus()
-                if isRunning { break }
+        stopServer()
+        
+        // Wait 400ms before starting new process to ensure port is freed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            guard let self = self else { return }
+            let splashPath = self.splashExecutablePath
+            let script = """
+            tell application "Terminal"
+                do script "\(splashPath) serve --model \(model) --port \(port)"
+                activate
+            end tell
+            """
+            if let appleScript = NSAppleScript(source: script) {
+                var error: NSDictionary?
+                appleScript.executeAndReturnError(&error)
+                if let error = error {
+                    print("AppleScript error starting server: \(error)")
+                }
+            }
+            
+            Task {
+                for _ in 0..<12 {
+                    try? await Task.sleep(nanoseconds: 800_000_000)
+                    await self.checkServerStatus()
+                    if self.isRunning { break }
+                }
             }
         }
     }
@@ -412,7 +707,52 @@ public class SplashService: ObservableObject {
         startServer(model: model, port: activePort)
     }
     
+    // MARK: - Agent Launcher Helpers
+    
+    public func isAgentInstalled(agent: String) -> Bool {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let candidates = [
+            "/opt/homebrew/bin/\(agent)",
+            "/usr/local/bin/\(agent)",
+            "/usr/bin/\(agent)",
+            "\(home)/.npm-global/bin/\(agent)",
+            "\(home)/.cargo/bin/\(agent)",
+            "\(home)/.local/bin/\(agent)"
+        ]
+        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
+            return true
+        }
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        proc.arguments = [agent]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        try? proc.run()
+        proc.waitUntilExit()
+        return proc.terminationStatus == 0
+    }
+    
+    public func agentInstallURL(agent: String) -> URL {
+        switch agent {
+        case "claude":
+            return URL(string: "https://code.claude.com/docs/en/overview")!
+        case "opencode":
+            return URL(string: "https://opencode.ai/docs/")!
+        case "codex":
+            return URL(string: "https://developers.openai.com/codex/cli/")!
+        case "hermes":
+            return URL(string: "https://hermes-agent.nousresearch.com/docs/getting-started/installation/")!
+        default:
+            return URL(string: "https://github.com/incoai/splash")!
+        }
+    }
+    
     public func launchAgent(agent: String) {
+        guard isSplashInstalled else {
+            installSplashDependency()
+            return
+        }
+        
         let splashPath = splashExecutablePath
         let script = """
         tell application "Terminal"

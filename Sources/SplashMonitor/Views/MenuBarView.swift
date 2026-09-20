@@ -4,6 +4,7 @@ import AppKit
 public struct MenuBarView: View {
     @ObservedObject var service: SplashService
     @ObservedObject var loc = Localization.shared
+    @Environment(\.openWindow) private var openWindow
     @State private var activeTab: AppTab = .metrics
     
     public enum AppTab: String, CaseIterable, Identifiable {
@@ -61,6 +62,10 @@ public struct MenuBarView: View {
             // Main Content Area
             ScrollView {
                 VStack(spacing: 12) {
+                    if !service.isSplashInstalled {
+                        DependencyInstallView(service: service)
+                    }
+                    
                     switch activeTab {
                     case .metrics:
                         TokenMetricsView(service: service)
@@ -106,17 +111,33 @@ public struct MenuBarView: View {
                         .padding(.vertical, 1)
                         .background(Color.orange)
                         .cornerRadius(3)
+                    
+                    if !service.isSplashInstalled {
+                        Text("BREW")
+                            .font(.system(size: 7, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(Color.red)
+                            .cornerRadius(3)
+                    }
                 }
                 
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(service.isRunning ? Color.green : Color.red)
+                        .fill(service.isRunning ? Color.green : (service.isSplashInstalled ? Color.red : Color.orange))
                         .frame(width: 6, height: 6)
                     
-                    Text(service.isRunning ? service.activeModel.components(separatedBy: "/").last ?? service.activeModel : tr(es: "Desconectado", en: "Offline"))
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                    if !service.isSplashInstalled {
+                        Text(tr(es: "Requiere Splash", en: "Needs Splash"))
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.orange)
+                    } else {
+                        Text(service.isRunning ? service.activeModel.components(separatedBy: "/").last ?? service.activeModel : tr(es: "Desconectado", en: "Offline"))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
             
@@ -271,8 +292,9 @@ public struct MenuBarView: View {
     }
     
     private func openMainWindow() {
+        openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
-        for window in NSApp.windows where window.title == "Splash Monitor" {
+        for window in NSApp.windows where window.canBecomeMain {
             window.makeKeyAndOrderFront(nil)
             return
         }

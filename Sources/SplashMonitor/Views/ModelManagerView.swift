@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 public struct ModelManagerView: View {
     @ObservedObject var service: SplashService
@@ -6,6 +7,10 @@ public struct ModelManagerView: View {
     @State private var selectedTab: Int = 0 // 0: Instalados, 1: Explorar HF, 2: Personalizado
     @State private var customRepoId: String = ""
     @State private var searchText: String = ""
+    
+    // Model deletion alert state
+    @State private var showingDeleteAlert: Bool = false
+    @State private var modelToDelete: InstalledSplashModel? = nil
     
     public init(service: SplashService) {
         self.service = service
@@ -38,6 +43,21 @@ public struct ModelManagerView: View {
                 installationConsoleView
             }
         }
+        .alert(
+            tr(es: "¿Eliminar Modelo?", en: "Delete Model?"),
+            isPresented: $showingDeleteAlert,
+            presenting: modelToDelete
+        ) { model in
+            Button(tr(es: "Eliminar de Splash", en: "Delete from Splash"), role: .destructive) {
+                service.deleteModel(repoId: model.repoId)
+            }
+            Button(tr(es: "Cancelar", en: "Cancel"), role: .cancel) {}
+        } message: { model in
+            Text(tr(
+                es: "¿Estás seguro de que deseas eliminar '\(model.shortName)'? Se desvinculará del motor Splash y liberará espacio en disco (\(model.formattedSize)).",
+                en: "Are you sure you want to delete '\(model.shortName)'? It will be unlinked from the Splash engine to free up disk space (\(model.formattedSize))."
+            ))
+        }
     }
     
     // MARK: - Installed Models Tab
@@ -50,6 +70,9 @@ public struct ModelManagerView: View {
                         .foregroundColor(.secondary)
                     Text(tr(es: "No hay modelos instalados en Splash aún.", en: "No models installed in Splash yet."))
                         .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text(tr(es: "Explora el catálogo de Hugging Face para descargar el primer modelo.", en: "Browse the Hugging Face catalog to download your first model."))
+                        .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity, minHeight: 90)
@@ -86,11 +109,34 @@ public struct ModelManagerView: View {
                                             .foregroundColor(.secondary)
                                         Text(model.formattedSize)
                                             .font(.system(size: 10, weight: .medium, design: .monospaced))
-                                            .foregroundColor(.secondary)
+                                            .foregroundColor(.primary)
                                     }
                                 }
                                 
                                 Spacer()
+                                
+                                // Reveal in Finder button
+                                Button {
+                                    service.openModelInFinder(repoId: model.repoId)
+                                } label: {
+                                    Image(systemName: "folder")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                                .help(tr(es: "Mostrar carpeta en el Finder", en: "Reveal folder in Finder"))
+                                
+                                // Delete Model button
+                                Button {
+                                    modelToDelete = model
+                                    showingDeleteAlert = true
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.red.opacity(0.8))
+                                }
+                                .buttonStyle(.borderless)
+                                .help(tr(es: "Eliminar modelo para liberar espacio", en: "Delete model to free up space"))
                                 
                                 if !model.isCurrentlyActive {
                                     Button {
@@ -297,7 +343,16 @@ public struct ModelManagerView: View {
                 
                 Spacer()
                 
-                if !service.isInstalling {
+                if service.isInstalling {
+                    Button(role: .destructive) {
+                        service.cancelModelInstall()
+                    } label: {
+                        Text(tr(es: "Cancelar Descarga", en: "Cancel Download"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.borderless)
+                } else {
                     Button(tr(es: "Cerrar", en: "Close")) {
                         service.installLogs.removeAll()
                         service.installSuccess = nil

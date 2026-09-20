@@ -27,7 +27,7 @@ struct SplashMonitorApp: App {
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     
     var body: some Scene {
-        WindowGroup("Splash Monitor") {
+        WindowGroup("Splash Monitor", id: "main") {
             MainWindowView(service: service)
                 .frame(minWidth: 850, minHeight: 600)
         }

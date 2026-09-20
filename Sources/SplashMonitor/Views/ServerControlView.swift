@@ -9,12 +9,23 @@ public struct ServerControlView: View {
     @State private var customModelText: String = ""
     @State private var copiedMessage: String? = nil
     
+    // Agent alert state
+    @State private var showingAgentOfflineAlert: Bool = false
+    @State private var showingAgentNotInstalledAlert: Bool = false
+    @State private var pendingAgentName: String = ""
+    @State private var pendingAgentCommand: String = ""
+    
     public init(service: SplashService) {
         self.service = service
     }
     
     public var body: some View {
         VStack(spacing: 12) {
+            // 0. Dependency missing alert if needed
+            if !service.isSplashInstalled {
+                dependencyWarningBanner
+            }
+            
             // 1. Current Status Banner
             statusBannerView
             
@@ -33,6 +44,71 @@ public struct ServerControlView: View {
         .onChange(of: service.activePort) { newPort in
             portString = "\(newPort)"
         }
+        .alert(
+            tr(es: "Servidor Splash Apagado", en: "Splash Server Offline"),
+            isPresented: $showingAgentOfflineAlert
+        ) {
+            Button(tr(es: "Arrancar Servidor Primero", en: "Start Server First")) {
+                let targetModel = isCustomModel ? customModelText.trimmingCharacters(in: .whitespacesAndNewlines) : service.selectedModelForLaunch
+                let targetPort = Int(portString) ?? service.activePort
+                service.startServer(model: targetModel, port: targetPort)
+            }
+            Button(tr(es: "Cancelar", en: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                es: "Para conectar \(pendingAgentName), el servidor de inferencia local Splash debe estar activo. Arranca el servidor primero.",
+                en: "To connect \(pendingAgentName), the local Splash inference server must be running. Start the server first."
+            ))
+        }
+        .alert(
+            tr(es: "\(pendingAgentName) No Encontrado", en: "\(pendingAgentName) Not Found"),
+            isPresented: $showingAgentNotInstalledAlert
+        ) {
+            Button(tr(es: "Abrir Guía de Instalación", en: "Open Installation Guide")) {
+                let url = service.agentInstallURL(agent: pendingAgentCommand)
+                NSWorkspace.shared.open(url)
+            }
+            Button(tr(es: "Lanzar en Terminal de Todos Modos", en: "Launch in Terminal Anyway")) {
+                service.launchAgent(agent: pendingAgentCommand)
+            }
+            Button(tr(es: "Cancelar", en: "Cancel"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                es: "No se detectó el comando '\(pendingAgentCommand)' en tu sistema. Puedes instalarlo siguiendo la guía oficial.",
+                en: "Command '\(pendingAgentCommand)' was not detected on your system. You can install it following the official guide."
+            ))
+        }
+    }
+    
+    // MARK: - 0. Dependency Warning Banner
+    private var dependencyWarningBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+                .font(.system(size: 14))
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text(tr(es: "Splash CLI no está instalado en este Mac", en: "Splash CLI is not installed on this Mac"))
+                    .font(.system(size: 11, weight: .bold))
+                Text("brew install incoai/tap/splash")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Button {
+                service.installSplashDependency()
+            } label: {
+                Text(tr(es: "Instalar Ahora", en: "Install Now"))
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(8)
+        .background(Color.orange.opacity(0.15))
+        .cornerRadius(8)
     }
     
     // MARK: - 1. Status Banner
@@ -238,25 +314,82 @@ public struct ServerControlView: View {
     // MARK: - 3. Coding Agents Launcher
     private var agentsLauncherView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(tr(es: "Conectar Agentes de Código", en: "Connect Coding Agents"))
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.secondary)
+            HStack {
+                Text(tr(es: "Conectar Agentes de Código", en: "Connect Coding Agents"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                if !service.isRunning {
+                    HStack(spacing: 3) {
+                        Image(systemName: "info.circle")
+                        Text(tr(es: "Servidor inactivo", en: "Server offline"))
+                    }
+                    .font(.system(size: 9))
+                    .foregroundColor(.orange)
+                }
+            }
             
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                AgentButton(name: "Claude Code", icon: "brain.head.profile", command: "claude") {
-                    service.launchAgent(agent: "claude")
+                AgentButton(
+                    name: "Claude Code",
+                    icon: "brain.head.profile",
+                    command: "claude",
+                    isInstalled: service.isAgentInstalled(agent: "claude"),
+                    isServerRunning: service.isRunning
+                ) {
+                    handleAgentLaunch(name: "Claude Code", command: "claude")
                 }
-                AgentButton(name: "OpenCode", icon: "chevron.left.forwardslash.chevron.right", command: "opencode") {
-                    service.launchAgent(agent: "opencode")
+                
+                AgentButton(
+                    name: "OpenCode",
+                    icon: "chevron.left.forwardslash.chevron.right",
+                    command: "opencode",
+                    isInstalled: service.isAgentInstalled(agent: "opencode"),
+                    isServerRunning: service.isRunning
+                ) {
+                    handleAgentLaunch(name: "OpenCode", command: "opencode")
                 }
-                AgentButton(name: "Codex", icon: "terminal", command: "codex") {
-                    service.launchAgent(agent: "codex")
+                
+                AgentButton(
+                    name: "Codex",
+                    icon: "terminal",
+                    command: "codex",
+                    isInstalled: service.isAgentInstalled(agent: "codex"),
+                    isServerRunning: service.isRunning
+                ) {
+                    handleAgentLaunch(name: "Codex", command: "codex")
                 }
-                AgentButton(name: "Hermes", icon: "bolt.horizontal", command: "hermes") {
-                    service.launchAgent(agent: "hermes")
+                
+                AgentButton(
+                    name: "Hermes",
+                    icon: "bolt.horizontal",
+                    command: "hermes",
+                    isInstalled: service.isAgentInstalled(agent: "hermes"),
+                    isServerRunning: service.isRunning
+                ) {
+                    handleAgentLaunch(name: "Hermes", command: "hermes")
                 }
             }
         }
+    }
+    
+    private func handleAgentLaunch(name: String, command: String) {
+        pendingAgentName = name
+        pendingAgentCommand = command
+        
+        guard service.isRunning else {
+            showingAgentOfflineAlert = true
+            return
+        }
+        
+        if !service.isAgentInstalled(agent: command) {
+            showingAgentNotInstalledAlert = true
+            return
+        }
+        
+        service.launchAgent(agent: command)
     }
     
     // MARK: - 4. API Endpoints & Copy Helpers
@@ -323,6 +456,8 @@ struct AgentButton: View {
     let name: String
     let icon: String
     let command: String
+    let isInstalled: Bool
+    let isServerRunning: Bool
     let action: () -> Void
     
     var body: some View {
@@ -330,22 +465,33 @@ struct AgentButton: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 11))
-                    .foregroundColor(.accentColor)
+                    .foregroundColor(isServerRunning ? .accentColor : .secondary)
+                
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(name)
-                        .font(.system(size: 11, weight: .medium))
+                    HStack(spacing: 4) {
+                        Text(name)
+                            .font(.system(size: 11, weight: .medium))
+                        
+                        Circle()
+                            .fill(isInstalled ? Color.green : Color.secondary.opacity(0.4))
+                            .frame(width: 5, height: 5)
+                    }
+                    
                     Text("splash \(command)")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundColor(.secondary)
                 }
+                
                 Spacer()
+                
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 9))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isServerRunning ? .secondary : .secondary.opacity(0.4))
             }
             .padding(6)
             .background(Color(nsColor: .controlBackgroundColor))
             .cornerRadius(6)
+            .opacity(isServerRunning ? 1.0 : 0.75)
         }
         .buttonStyle(.plain)
     }
