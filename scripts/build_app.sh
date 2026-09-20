@@ -19,6 +19,12 @@ rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
+# Copiar recursos
+if [ -f "$DIR/Resources/AppIcon.icns" ]; then
+    echo "🎨 Copiando icono de la aplicación (AppIcon.icns)..."
+    cp "$DIR/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+fi
+
 # Copiar binario
 cp "$BUILD_DIR/SplashMonitor" "$MACOS_DIR/SplashMonitor"
 chmod +x "$MACOS_DIR/SplashMonitor"
@@ -33,6 +39,10 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
     <string>es</string>
     <key>CFBundleExecutable</key>
     <string>SplashMonitor</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>com.incoai.splashmonitor</string>
     <key>CFBundleInfoDictionaryVersion</key>

@@ -8,10 +8,20 @@ public struct AboutView: View {
     
     public var body: some View {
         VStack(spacing: 20) {
-            // Header with Dominican Emblem
-            VStack(spacing: 10) {
-                DominicanEmblem(size: 48)
-                    .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+            // Header with App Icon and Dominican Badge
+            VStack(spacing: 12) {
+                if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+                   let iconImage = NSImage(contentsOf: iconURL) {
+                    Image(nsImage: iconImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 72, height: 72)
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
+                } else {
+                    DominicanEmblem(size: 52)
+                        .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
+                }
                 
                 Text("Splash Monitor")
                     .font(.system(size: 24, weight: .bold, design: .rounded))
