@@ -134,25 +134,35 @@ brew install incoai/tap/splash
 
 Una vez que Splash esté instalado y funcionando, instala Splash Monitor:
 
-#### Opción A — Descarga Directa (Usuarios Finales)
+#### Opción A — Instalación en 1 Línea (Recomendada · Sin Alertas)
 
-> No necesitas Xcode ni herramientas de desarrollo.
+La forma más rápida y limpia de instalar Splash Monitor sin pasar por las alertas de Gatekeeper:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts/install.sh | bash
+```
+
+> ⚡️ Este comando descarga el DMG oficial de GitHub Releases, lo monta, copia la app a `/Applications` y la abre automáticamente.
+
+---
+
+#### Opción B — Descarga Manual del DMG
 
 1. **Descarga** el instalador oficial:
    👉 [**SplashMonitor-1.0.0-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.0-beta/SplashMonitor-1.0.0-beta.dmg) *(4.3 MB)*
 
-2. Haz doble clic en el `.dmg` descargado.
+2. Haz doble clic en el `.dmg` descargado y arrastra **Splash Monitor** a **Aplicaciones**.
 
-3. Arrastra **Splash Monitor** a la carpeta **Aplicaciones**.
-
-4. Abre **Splash Monitor** desde Launchpad, Spotlight o tu carpeta de Aplicaciones.
-
-> 💡 **Nota sobre macOS Gatekeeper (Primera Apertura)**:
-> Al ser una aplicación de código abierto descargada desde GitHub, macOS puede mostrar el aviso *"Splash Monitor está dañada y no se puede abrir"*. Para resolverlo en un segundo:
+> 🛡️ **Si macOS muestra: "Apple no ha podido verificar que no contenga software malicioso..."**:
+> Este aviso lo impone macOS a todas las apps de código abierto sin licencia de pago de Apple. Para abrirla:
+> 1. Ve a **Ajustes del Sistema** en tu Mac.
+> 2. Haz clic en **Privacidad y seguridad** (en la barra lateral) y baja hasta **Seguridad**.
+> 3. Pulsa el botón **"Abrir de todas formas"** (*Open Anyway*).
+> 
+> *O por Terminal (1 segundo):*
 > ```bash
-> xattr -cr "/Applications/Splash Monitor.app"
+> xattr -d com.apple.quarantine ~/Downloads/SplashMonitor*.dmg
 > ```
-> O también puedes hacer **Clic Derecho** (Control + Clic) sobre la app en *Aplicaciones* y seleccionar **Abrir**.
 
 ---
 
@@ -393,25 +403,35 @@ brew install incoai/tap/splash
 
 Once Splash is installed and running, install Splash Monitor:
 
-#### Option A — Direct Download (End Users)
+#### Option A — 1-Line Quick Install (Recommended · Zero Prompts)
 
-> No Xcode or development tools required.
+The fastest and cleanest way to install Splash Monitor without macOS Gatekeeper warnings:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts/install.sh | bash
+```
+
+> ⚡️ This script downloads the official DMG from GitHub Releases, mounts it, installs to `/Applications`, and opens the app automatically.
+
+---
+
+#### Option B — Manual DMG Download
 
 1. **Download** the official installer:
    👉 [**SplashMonitor-1.0.0-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.0-beta/SplashMonitor-1.0.0-beta.dmg) *(4.3 MB)*
 
-2. Double-click the downloaded `.dmg` file.
+2. Double-click the downloaded `.dmg` and drag **Splash Monitor** to **Applications**.
 
-3. Drag **Splash Monitor** to your **Applications** folder.
-
-4. Launch **Splash Monitor** from Launchpad, Spotlight, or your Applications folder.
-
-> 💡 **macOS Gatekeeper Note (First Launch)**:
-> Since this is an open-source app downloaded outside the Mac App Store, macOS may display *"Splash Monitor is damaged and can't be opened"*. To fix this in one second:
+> 🛡️ **If macOS shows: "Apple cannot verify that this app is free of malware..."**:
+> This is a standard Gatekeeper notice for independent open-source apps. To allow it:
+> 1. Open **System Settings** on your Mac.
+> 2. Go to **Privacy & Security** and scroll down to the **Security** section.
+> 3. Click **"Open Anyway"**.
+> 
+> *Or via Terminal (1 second):*
 > ```bash
-> xattr -cr "/Applications/Splash Monitor.app"
+> xattr -d com.apple.quarantine ~/Downloads/SplashMonitor*.dmg
 > ```
-> Or **Right-Click** (Control + Click) the app in your *Applications* folder and select **Open**.
 
 ---
 
