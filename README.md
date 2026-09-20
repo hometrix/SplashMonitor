@@ -106,6 +106,26 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 
 ### 📥 Instalación
 
+#### Requisitos Previos — Motor Splash de Inco AI
+
+Splash Monitor es un monitor gráfico para el motor de inferencia local **[Splash](https://github.com/incoai/splash)** de Inco AI. Antes de instalar Splash Monitor, necesitas tener Splash funcionando en tu Mac.
+
+**Instala Splash desde el repositorio oficial de Inco AI:**
+
+```bash
+# Agregar el tap oficial de Inco AI e instalar Splash
+brew install incoai/tap/splash
+```
+
+> 📋 **Requisitos del motor Splash** (según [incoai/splash](https://github.com/incoai/splash)):
+> - Mac con Apple Silicon **M3 o posterior**
+> - **macOS 26.4** (Tahoe) o posterior
+> - **36 GB** de memoria unificada (48 GB o más recomendado)
+>
+> Los modelos se descargan automáticamente en el primer uso. Consulta los modelos disponibles en [huggingface.co/incoai](https://huggingface.co/incoai).
+
+Una vez que Splash esté instalado y funcionando, instala Splash Monitor:
+
 #### Opción A — Descarga Directa (Usuarios Finales)
 
 > No necesitas Xcode ni herramientas de desarrollo.
@@ -117,12 +137,7 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 
 3. Arrastra **Splash Monitor** a la carpeta **Aplicaciones**.
 
-4. **Prerequisito** — Asegúrate de tener Splash instalado:
-   ```bash
-   brew install incoai/tap/splash
-   ```
-
-5. Abre **Splash Monitor** desde Launchpad, Spotlight o tu carpeta de Aplicaciones.
+4. Abre **Splash Monitor** desde Launchpad, Spotlight o tu carpeta de Aplicaciones.
 
 ---
 
@@ -135,6 +150,7 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 | Mac | Apple Silicon (M3, M4, M5) |
 | macOS | 13.0 o superior |
 | Xcode | 15+ o Swift 6.0 Toolchain |
+| Splash Engine | [incoai/tap/splash](https://github.com/incoai/splash) |
 
 ```bash
 # 1. Clonar el repositorio
@@ -247,6 +263,23 @@ Este proyecto está licenciado bajo la **Licencia MIT**. Consulta el archivo [LI
 MIT License — Copyright (c) 2026 JMGREP Developers / Joan Gregorio Pérez
 ```
 
+#### Atribuciones y Licencias de Componentes
+
+Splash Monitor es una aplicación independiente que interactúa con componentes de terceros. A continuación se detallan las licencias de cada dependencia:
+
+| Componente | Licencia | Repositorio |
+|:-----------|:---------|:------------|
+| **Splash Monitor** | MIT | [hometrix/SplashMonitor](https://github.com/hometrix/SplashMonitor) |
+| **Splash Engine** | Apache-2.0 | [incoai/splash](https://github.com/incoai/splash) |
+| **Modelo Qwen3.8-27B-Splash** | Apache-2.0 | [incoai/Qwen3.8-27B-Splash](https://huggingface.co/incoai/Qwen3.8-27B-Splash) |
+| **Modelo Qwen3.6-35B-A3B-Splash** | Apache-2.0 | [incoai/Qwen3.6-35B-A3B-Splash](https://huggingface.co/incoai/Qwen3.6-35B-A3B-Splash) |
+| **Qwen3.8-27B** (base) | Apache-2.0 | [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) |
+| **Qwen3.6-35B-A3B** (base) | Apache-2.0 | [Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) |
+
+> ⚠️ **Aviso**: Los pesos de los modelos mantienen sus propias licencias. Consulta cada repositorio en Hugging Face para los términos específicos.
+
+> ℹ️ **Disclaimer**: Splash Monitor es un proyecto independiente y **no está afiliado, patrocinado ni respaldado por Inco AI**. "Splash" es una marca de Inco AI. Este proyecto utiliza la API pública de Splash bajo los términos de la licencia Apache-2.0.
+
 ---
 
 <div id="-english"></div>
@@ -325,6 +358,26 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 
 ### 📥 Installation
 
+#### Prerequisites — Inco AI Splash Engine
+
+Splash Monitor is a graphical monitor for Inco AI's **[Splash](https://github.com/incoai/splash)** local inference engine. Before installing Splash Monitor, you need Splash running on your Mac.
+
+**Install Splash from the official Inco AI repository:**
+
+```bash
+# Add the official Inco AI tap and install Splash
+brew install incoai/tap/splash
+```
+
+> 📋 **Splash engine requirements** (from [incoai/splash](https://github.com/incoai/splash)):
+> - Mac with Apple Silicon **M3 or newer**
+> - **macOS 26.4** (Tahoe) or later
+> - **36 GB** of unified memory (48 GB or more recommended)
+>
+> Models are downloaded automatically on first use. See available models at [huggingface.co/incoai](https://huggingface.co/incoai).
+
+Once Splash is installed and running, install Splash Monitor:
+
 #### Option A — Direct Download (End Users)
 
 > No Xcode or development tools required.
@@ -336,12 +389,7 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 
 3. Drag **Splash Monitor** to your **Applications** folder.
 
-4. **Prerequisite** — Ensure Splash is installed:
-   ```bash
-   brew install incoai/tap/splash
-   ```
-
-5. Launch **Splash Monitor** from Launchpad, Spotlight, or your Applications folder.
+4. Launch **Splash Monitor** from Launchpad, Spotlight, or your Applications folder.
 
 ---
 
@@ -354,6 +402,7 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 | Mac | Apple Silicon (M3, M4, M5) |
 | macOS | 13.0 or later |
 | Xcode | 15+ or Swift 6.0 Toolchain |
+| Splash Engine | [incoai/tap/splash](https://github.com/incoai/splash) |
 
 ```bash
 # 1. Clone the repository
@@ -465,6 +514,23 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 ```
 MIT License — Copyright (c) 2026 JMGREP Developers / Joan Gregorio Pérez
 ```
+
+#### Attributions & Component Licenses
+
+Splash Monitor is an independent application that interfaces with third-party components. Below are the licenses for each dependency:
+
+| Component | License | Repository |
+|:----------|:--------|:-----------|
+| **Splash Monitor** | MIT | [hometrix/SplashMonitor](https://github.com/hometrix/SplashMonitor) |
+| **Splash Engine** | Apache-2.0 | [incoai/splash](https://github.com/incoai/splash) |
+| **Qwen3.8-27B-Splash Model** | Apache-2.0 | [incoai/Qwen3.8-27B-Splash](https://huggingface.co/incoai/Qwen3.8-27B-Splash) |
+| **Qwen3.6-35B-A3B-Splash Model** | Apache-2.0 | [incoai/Qwen3.6-35B-A3B-Splash](https://huggingface.co/incoai/Qwen3.6-35B-A3B-Splash) |
+| **Qwen3.8-27B** (base model) | Apache-2.0 | [Qwen/Qwen3.8-27B](https://huggingface.co/Qwen/Qwen3.8-27B) |
+| **Qwen3.6-35B-A3B** (base model) | Apache-2.0 | [Qwen/Qwen3.6-35B-A3B](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) |
+
+> ⚠️ **Note**: Model weights retain their own licenses. Check each Hugging Face repository for specific terms.
+
+> ℹ️ **Disclaimer**: Splash Monitor is an independent project and is **not affiliated with, sponsored by, or endorsed by Inco AI**. "Splash" is a trademark of Inco AI. This project interfaces with the public Splash API under the terms of the Apache-2.0 license.
 
 ---
 
