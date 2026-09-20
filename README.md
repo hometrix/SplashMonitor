@@ -147,6 +147,13 @@ Una vez que Splash esté instalado y funcionando, instala Splash Monitor:
 
 4. Abre **Splash Monitor** desde Launchpad, Spotlight o tu carpeta de Aplicaciones.
 
+> 💡 **Nota sobre macOS Gatekeeper (Primera Apertura)**:
+> Al ser una aplicación de código abierto descargada desde GitHub, macOS puede mostrar el aviso *"Splash Monitor está dañada y no se puede abrir"*. Para resolverlo en un segundo:
+> ```bash
+> xattr -cr "/Applications/Splash Monitor.app"
+> ```
+> O también puedes hacer **Clic Derecho** (Control + Clic) sobre la app en *Aplicaciones* y seleccionar **Abrir**.
+
 ---
 
 #### Opción B — Compilar desde Código Fuente (Desarrolladores)
@@ -398,6 +405,13 @@ Once Splash is installed and running, install Splash Monitor:
 3. Drag **Splash Monitor** to your **Applications** folder.
 
 4. Launch **Splash Monitor** from Launchpad, Spotlight, or your Applications folder.
+
+> 💡 **macOS Gatekeeper Note (First Launch)**:
+> Since this is an open-source app downloaded outside the Mac App Store, macOS may display *"Splash Monitor is damaged and can't be opened"*. To fix this in one second:
+> ```bash
+> xattr -cr "/Applications/Splash Monitor.app"
+> ```
+> Or **Right-Click** (Control + Click) the app in your *Applications* folder and select **Open**.
 
 ---
 
