@@ -92,7 +92,7 @@ public struct MenuBarView: View {
     // MARK: - Header
     private var headerView: some View {
         HStack(spacing: 8) {
-            DominicanEmblem(size: 18)
+            AppIconView(size: 20)
             
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {

@@ -48,7 +48,7 @@ public struct MainWindowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // App Branding Header
                 HStack(spacing: 10) {
-                    DominicanEmblem(size: 24)
+                    AppIconView(size: 28)
                     
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Splash Monitor")

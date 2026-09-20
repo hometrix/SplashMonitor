@@ -158,7 +158,9 @@ public struct TokenMetricsView: View {
             
             // JMGREP Developers signature
             HStack(spacing: 5) {
-                DominicanEmblem(size: 12)
+                Image(systemName: "hammer.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor(.accentColor)
                 Text("JMGREP Developers")
                     .font(.system(size: 10, weight: .bold))
                 Text("By Joan Gregorio Pérez - Ingeniero en software")
