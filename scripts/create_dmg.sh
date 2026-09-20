@@ -32,6 +32,11 @@ if [ -f "$DIR/Resources/AppIcon.icns" ]; then
     cp "$DIR/Resources/AppIcon.icns" "$TEMP_DMG_DIR/.VolumeIcon.icns"
 fi
 
+# Limpiar atributos extendidos y firmar la app dentro del DMG
+echo "✍️  Firmando la app dentro del directorio temporal del DMG..."
+xattr -cr "$TEMP_DMG_DIR"
+codesign --force --deep --sign - "$TEMP_DMG_DIR/$APP_NAME.app"
+
 # Generar el archivo DMG comprimido UDZO
 echo "💿 Empaquetando imagen de disco con hdiutil..."
 hdiutil create -volname "Splash Monitor" \
@@ -42,6 +47,10 @@ hdiutil create -volname "Splash Monitor" \
 
 # Limpiar directorio temporal
 rm -rf "$TEMP_DMG_DIR"
+
+# Firmar el archivo DMG resultante
+echo "✍️  Firmando el archivo DMG..."
+codesign --force --sign - "$DMG_OUTPUT"
 
 echo "✅ DMG creado con éxito en: $DMG_OUTPUT"
 ls -lh "$DMG_OUTPUT"

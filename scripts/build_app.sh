@@ -72,5 +72,10 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
 </plist>
 EOF
 
+# Firmar el bundle de macOS con ad-hoc signing (sellar Info.plist y recursos)
+echo "✍️  Firmando bundle con firma ad-hoc..."
+codesign --force --deep --sign - "$APP_DIR"
+
 echo "✅ App compilada con éxito en: $APP_DIR"
 echo "🚀 Puedes iniciarla ejecutando: open '$APP_DIR'"
+

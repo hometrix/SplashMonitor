@@ -24,6 +24,14 @@
 
 <br/>
 
+<div align="center">
+  <img src="screenshots/splash-monitor-dashboard.png" width="720" alt="Splash Monitor Dashboard" />
+  <br/><br/>
+  <img src="screenshots/splash-monitor-metrics.png" width="720" alt="Splash Monitor Metrics" />
+</div>
+
+<br/>
+
 **[🇪🇸 Español](#-español)** &nbsp;·&nbsp; **[🇬🇧 English](#-english)**
 
 </div>
