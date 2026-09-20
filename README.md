@@ -57,7 +57,7 @@
 Clona este repositorio y ejecuta el script de empaquetado:
 
 ```bash
-git clone https://github.com/<tu-usuario>/SplashMonitor.git
+git clone https://github.com/hometrix/SplashMonitor.git
 cd SplashMonitor
 ./scripts/build_app.sh
 ```
