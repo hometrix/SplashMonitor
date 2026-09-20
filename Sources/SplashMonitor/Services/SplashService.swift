@@ -10,7 +10,7 @@ public class SplashService: ObservableObject {
     // MARK: - Published State
     @Published public var isRunning: Bool = false
     @Published public var activePid: Int? = nil
-    @Published public var activePort: Int = 8005
+    @Published public var activePort: Int = 8000
     @Published public var activeModel: String = "Ninguno"
     @Published public var status: SplashStatus? = nil
     @Published public var lastError: String? = nil
@@ -408,9 +408,9 @@ public class SplashService: ObservableObject {
                 self.status = nil
             }
         } catch {
-            // Fallback to port 8000 if 8005 failed and lock file wasn't present
-            if lockPid == nil && activePort == 8005 {
-                await tryFallbackPort8000()
+            // Fallback to port 8005 if 8000 failed and lock file wasn't present
+            if lockPid == nil && activePort == 8000 {
+                await tryFallbackPort8005()
             } else {
                 self.isRunning = false
                 self.status = nil
@@ -421,14 +421,14 @@ public class SplashService: ObservableObject {
         refreshInstalledModels()
     }
     
-    private func tryFallbackPort8000() async {
-        guard let url = URL(string: "http://127.0.0.1:8000/status") else { return }
+    private func tryFallbackPort8005() async {
+        guard let url = URL(string: "http://127.0.0.1:8005/status") else { return }
         var request = URLRequest(url: url)
         request.timeoutInterval = 0.8
         if let (data, response) = try? await URLSession.shared.data(for: request),
            let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200,
            let decoded = try? JSONDecoder().decode(SplashStatus.self, from: data) {
-            self.activePort = 8000
+            self.activePort = 8005
             self.status = decoded
             self.isRunning = decoded.ready ?? true
             if let instanceModel = decoded.instance?.model {
@@ -761,7 +761,7 @@ public class SplashService: ObservableObject {
         return result != 0
     }
     
-    public func startServer(model: String, port: Int = 8005) {
+    public func startServer(model: String, port: Int = 8000) {
         guard isSplashInstalled else {
             installSplashDependency()
             return
@@ -785,7 +785,7 @@ public class SplashService: ObservableObject {
             echo "==============================================="
             echo "Presiona Ctrl+C en esta ventana para detener el servidor."
             echo ""
-            "\(splashPath)" serve --model "\(model)" --port "\(port)"
+            "\(splashPath)" serve --model "\(model)"
             EXIT_CODE=$?
             if [ $EXIT_CODE -ne 0 ]; then
                 echo ""

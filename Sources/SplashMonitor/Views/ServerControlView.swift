@@ -4,7 +4,7 @@ import AppKit
 public struct ServerControlView: View {
     @ObservedObject var service: SplashService
     @ObservedObject var loc = Localization.shared
-    @State private var portString: String = "8005"
+    @State private var portString: String = "8000"
     @State private var isCustomModel: Bool = false
     @State private var customModelText: String = ""
     @State private var copiedMessage: String? = nil
@@ -259,7 +259,7 @@ public struct ServerControlView: View {
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                 
-                TextField("8005", text: $portString)
+                TextField("8000", text: $portString)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11, design: .monospaced))
                     .frame(width: 65)
