@@ -5,7 +5,7 @@
 [![Apple Silicon](https://img.shields.io/badge/hardware-Apple%20Silicon%20(M3%2F%20M4%2F%20M5)-green?style=flat-square)](https://inco.ai/blog/splash/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Release](https://img.shields.io/badge/version-1.0.0-purple.svg?style=flat-square)](#)
-[![Author](https://img.shields.io/badge/author-Joan%20Ml.%20Gregorio%20P.-red.svg?style=flat-square)](#autor--author)
+[![Author](https://img.shields.io/badge/author-JMGREP%20Developers%20--%20Joan%20Gregorio%20P%C3%A9rez-red.svg?style=flat-square)](#autor--author)
 
 **Splash Monitor** es la primera aplicación visual y herramienta de escritorio/barra de menú nativa para macOS creada para el motor de inferencia local de alto rendimiento **[Splash](https://inco.ai/blog/splash/)** de **Inco AI** en Apple Silicon.
 
@@ -105,10 +105,10 @@ SplashMonitor/
 
 ## 👨‍💻 Autor / Author
 
-Creado y desarrollado por:
+Creado y desarrollado por / Created and developed by:
 
-**Joan Ml. Gregorio P.**  
-*Ingeniero en Software / Software Engineer*  
+**JMGREP Developers**  
+**Joan Gregorio Pérez** — *Ingeniero en software / Software Engineer*  
 🇩🇴 República Dominicana  
 
 > *"La primera aplicación gráfica para potenciar la inferencia local con Splash en Apple Silicon."*

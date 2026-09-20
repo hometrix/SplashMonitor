@@ -27,4 +27,4 @@ Thank you for your interest in contributing to **Splash Monitor**!
 
 ---
 
-Created with ❤️ by **Joan Ml. Gregorio P.** (República Dominicana 🇩🇴).
+Created with ❤️ by **JMGREP Developers** · **Joan Gregorio Pérez** - *Ingeniero en software* (República Dominicana 🇩🇴).

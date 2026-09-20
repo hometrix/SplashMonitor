@@ -69,18 +69,18 @@ public struct AboutView: View {
                     
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text("Joan Ml. Gregorio P.")
+                            Text("Joan Gregorio Pérez")
                                 .font(.system(size: 15, weight: .bold))
                             Text("🇩🇴")
                         }
                         
-                        Text(tr(es: "Ingeniero en Software · Creador y Desarrollador", en: "Software Engineer · Creator & Developer"))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.secondary)
+                        Text("JMGREP Developers · \(tr(es: "Ingeniero en Software", en: "Software Engineer"))")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.accentColor)
                         
-                        Text("República Dominicana")
+                        Text(tr(es: "Creador y Desarrollador · República Dominicana", en: "Creator & Developer · Dominican Republic"))
                             .font(.system(size: 10))
-                            .foregroundColor(.secondary.opacity(0.8))
+                            .foregroundColor(.secondary)
                     }
                     
                     Spacer()
@@ -137,7 +137,7 @@ public struct AboutView: View {
             Spacer(minLength: 10)
             
             // Copyright
-            Text("© 2026 Joan Ml. Gregorio P. · \(tr(es: "Código Abierto", en: "Open Source"))")
+            Text("© 2026 JMGREP Developers · Joan Gregorio Pérez · \(tr(es: "Código Abierto", en: "Open Source"))")
                 .font(.system(size: 10))
                 .foregroundColor(.secondary.opacity(0.7))
         }

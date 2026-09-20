@@ -147,15 +147,25 @@ public struct TokenMetricsView: View {
             .cornerRadius(8)
             
             // Requests Overview
-            if let reqs = service.status?.requests {
-                HStack(spacing: 16) {
-                    RequestPill(title: tr(es: "Completadas", en: "Completed"), count: reqs.completed ?? 0, color: .green)
-                    RequestPill(title: tr(es: "En Cola", en: "Queued"), count: service.status?.scheduler?.queued ?? 0, color: .blue)
-                    RequestPill(title: tr(es: "Canceladas", en: "Cancelled"), count: reqs.cancelled ?? 0, color: .gray)
-                    RequestPill(title: tr(es: "Fallos", en: "Failed"), count: reqs.failed ?? 0, color: .red)
-                }
-                .font(.system(size: 10))
+            let reqs = service.status?.requests
+            HStack(spacing: 14) {
+                RequestPill(title: tr(es: "Completadas", en: "Completed"), count: reqs?.completed ?? 0, color: .green)
+                RequestPill(title: tr(es: "En Cola", en: "Queued"), count: service.status?.scheduler?.queued ?? 0, color: .blue)
+                RequestPill(title: tr(es: "Canceladas", en: "Cancelled"), count: reqs?.cancelled ?? 0, color: .gray)
+                RequestPill(title: tr(es: "Fallos", en: "Failed"), count: reqs?.failed ?? 0, color: .red)
             }
+            .font(.system(size: 10))
+            
+            // JMGREP Developers signature
+            HStack(spacing: 5) {
+                DominicanEmblem(size: 12)
+                Text("JMGREP Developers")
+                    .font(.system(size: 10, weight: .bold))
+                Text("By Joan Gregorio Pérez - Ingeniero en software")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
         }
     }
 }
