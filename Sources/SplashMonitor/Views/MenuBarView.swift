@@ -95,16 +95,17 @@ public struct MenuBarView: View {
             AppIconView(size: 20)
             
             VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Text("Splash Monitor")
                         .font(.system(size: 13, weight: .bold))
                     
-                    Text("v1.0")
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    Text("BETA")
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 1)
-                        .background(Color.secondary.opacity(0.15))
-                        .cornerRadius(4)
+                        .background(Color.orange)
+                        .cornerRadius(3)
                 }
                 
                 HStack(spacing: 4) {

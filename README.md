@@ -4,12 +4,12 @@
 [![Swift 6](https://img.shields.io/badge/language-Swift%206-orange?style=flat-square&logo=swift)](https://swift.org)
 [![Apple Silicon](https://img.shields.io/badge/hardware-Apple%20Silicon%20(M3%2F%20M4%2F%20M5)-green?style=flat-square)](https://inco.ai/blog/splash/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/version-1.0.0-purple.svg?style=flat-square)](#)
+[![Release](https://img.shields.io/badge/version-1.0.0--beta-orange.svg?style=flat-square)](#)
 [![Author](https://img.shields.io/badge/author-JMGREP%20Developers%20--%20Joan%20Gregorio%20P%C3%A9rez-red.svg?style=flat-square)](#autor--author)
 
-**Splash Monitor** es la primera aplicación visual y herramienta de escritorio/barra de menú nativa para macOS creada para el motor de inferencia local de alto rendimiento **[Splash](https://inco.ai/blog/splash/)** de **Inco AI** en Apple Silicon.
+**Splash Monitor** (Versión Beta) es la primera aplicación visual y herramienta de escritorio/barra de menú nativa para macOS creada para el motor de inferencia local de alto rendimiento **[Splash](https://inco.ai/blog/splash/)** de **Inco AI** en Apple Silicon.
 
-*English: **Splash Monitor** is the world's first native macOS visual desktop tool and menu bar monitor built specifically for Inco AI's **Splash** local inference engine on Apple Silicon.*
+*English: **Splash Monitor** (Beta Version) is the world's first native macOS visual desktop tool and menu bar monitor built specifically for Inco AI's **Splash** local inference engine on Apple Silicon.*
 
 ---
 

@@ -51,8 +51,18 @@ public struct MainWindowView: View {
                     AppIconView(size: 28)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Splash Monitor")
-                            .font(.system(size: 15, weight: .bold))
+                        HStack(spacing: 5) {
+                            Text("Splash Monitor")
+                                .font(.system(size: 15, weight: .bold))
+                            
+                            Text("BETA")
+                                .font(.system(size: 8, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.orange)
+                                .cornerRadius(3)
+                        }
                         
                         HStack(spacing: 4) {
                             Circle()

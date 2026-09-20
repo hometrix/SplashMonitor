@@ -16,8 +16,20 @@ public struct AboutView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                 
                 HStack(spacing: 6) {
-                    Text(tr(es: "Versión 1.0.0 · Primera Versión Oficial", en: "Version 1.0.0 · First Official Release"))
+                    Text("v1.0.0")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.secondary)
+                    
+                    Text("BETA")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 1)
+                        .background(Color.orange)
+                        .cornerRadius(4)
+                    
+                    Text(tr(es: "· Primera Versión", en: "· First Release"))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
                     
                     Text("🇩🇴")
