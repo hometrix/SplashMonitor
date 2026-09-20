@@ -15,8 +15,7 @@ public struct AppIconView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
-                .cornerRadius(size * 0.22)
-                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
         } else {
             // Elegant fallback: Splash droplet with neon cyan-indigo gradient
             ZStack {
