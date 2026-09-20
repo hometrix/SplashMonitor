@@ -1,0 +1,26 @@
+# Xcode / Swift Package Manager
+.build/
+Packages/
+Package.pins
+Package.resolved
+*.xcodeproj
+*.xcworkspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Application Bundles (Build artifacts)
+*.app/
+*.dSYM/
+
+# User-specific
+xcuserdata/
+*.mode1v3
+*.mode2v3
+*.perspectivev3
