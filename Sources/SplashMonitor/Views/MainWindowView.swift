@@ -82,19 +82,36 @@ public struct MainWindowView: View {
                 Divider()
                 
                 // Navigation items
-                List(SidebarItem.allCases, selection: $selectedSidebarItem) { item in
-                    NavigationLink(value: item) {
-                        Label {
-                            Text(item.title(isSpanish: loc.isSpanish))
-                                .font(.system(size: 13, weight: selectedSidebarItem == item ? .semibold : .regular))
-                        } icon: {
-                            Image(systemName: item.icon)
-                                .foregroundColor(selectedSidebarItem == item ? .accentColor : .secondary)
+                VStack(spacing: 3) {
+                    ForEach(SidebarItem.allCases) { item in
+                        Button {
+                            selectedSidebarItem = item
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(selectedSidebarItem == item ? .accentColor : .secondary)
+                                    .frame(width: 20, alignment: .center)
+                                
+                                Text(item.title(isSpanish: loc.isSpanish))
+                                    .font(.system(size: 13, weight: selectedSidebarItem == item ? .semibold : .regular))
+                                    .foregroundColor(selectedSidebarItem == item ? .primary : .secondary)
+                                
+                                Spacer()
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .fill(selectedSidebarItem == item ? Color.accentColor.opacity(0.15) : Color.clear)
+                            )
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
-                    .padding(.vertical, 2)
                 }
-                .listStyle(.sidebar)
+                .padding(.horizontal, 10)
+                .padding(.top, 10)
                 
                 Spacer()
                 
@@ -171,6 +188,9 @@ public struct MainWindowView: View {
             }
             .frame(minWidth: 560, minHeight: 480)
             .background(Color(nsColor: .windowBackgroundColor))
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ShowAboutView"))) { _ in
+                selectedSidebarItem = .about
+            }
         }
     }
     

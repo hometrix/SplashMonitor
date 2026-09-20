@@ -6,6 +6,25 @@ Package.resolved
 *.xcodeproj
 *.xcworkspace
 
+# Xcode Runtime & Derived Data
+DerivedData/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+
+# Swift Package Manager
+.swiftpm/
+playgrounds/
+*.playground/
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
 # macOS
 .DS_Store
 .AppleDouble
@@ -14,15 +33,50 @@ Icon
 ._*
 .Spotlight-V100
 .Trashes
+.fseventsd
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
 
 # Application Bundles (Build artifacts)
 *.app/
 *.dSYM/
 *.dmg
 .dmg_temp/
+*.app.zip
 
 # User-specific
 xcuserdata/
 *.mode1v3
 *.mode2v3
 *.perspectivev3
+*.pbxuser
+!default.pbxuser
+*.xcuserstate
+
+# Environment & Secrets
+.env
+.env.*
+
+# Logs
+*.log
+logs/
+
+# Temporary & Backup Files
+*.tmp
+*.bak
+*.orig
+*.rej
+\#*\#
+.#*
+
+# iOS / macOS specific (if applicable)
+Pods/
+Carthage/
+*.framework/
+*.xcframework/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output

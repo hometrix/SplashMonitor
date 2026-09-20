@@ -86,7 +86,7 @@ public struct MenuBarView: View {
                 .padding(.vertical, 8)
                 .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
         }
-        .frame(width: 390)
+        .frame(width: 440)
     }
     
     // MARK: - Header
@@ -171,28 +171,30 @@ public struct MenuBarView: View {
     
     // MARK: - Tab Selector Bar
     private var tabSelectorBar: some View {
-        HStack(spacing: 6) {
-            ForEach(AppTab.allCases) { tab in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        activeTab = tab
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 4) {
+                ForEach(AppTab.allCases) { tab in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            activeTab = tab
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 10))
+                            Text(tab.title(isSpanish: loc.isSpanish))
+                                .font(.system(size: 11, weight: activeTab == tab ? .semibold : .regular))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(activeTab == tab ? Color.accentColor.opacity(0.2) : Color.clear)
+                        .foregroundColor(activeTab == tab ? .accentColor : .secondary)
+                        .cornerRadius(6)
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 10))
-                        Text(tab.title(isSpanish: loc.isSpanish))
-                            .font(.system(size: 11, weight: activeTab == tab ? .semibold : .regular))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(activeTab == tab ? Color.accentColor.opacity(0.18) : Color.clear)
-                    .foregroundColor(activeTab == tab ? .accentColor : .secondary)
-                    .cornerRadius(6)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-            Spacer()
+            .padding(.horizontal, 4)
         }
     }
     

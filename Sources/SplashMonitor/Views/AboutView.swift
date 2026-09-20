@@ -145,15 +145,16 @@ public struct AboutView: View {
                 .controlSize(.small)
             }
             
-            Spacer(minLength: 10)
-            
             // Copyright
             Text("© 2026 JMGREP Developers · Joan Gregorio Pérez · \(tr(es: "Código Abierto", en: "Open Source"))")
                 .font(.system(size: 10))
                 .foregroundColor(.secondary.opacity(0.7))
+                .padding(.top, 6)
+                .padding(.bottom, 12)
         }
-        .padding(10)
+        .padding(14)
         .frame(maxWidth: 580)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 

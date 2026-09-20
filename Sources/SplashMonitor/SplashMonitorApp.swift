@@ -33,6 +33,17 @@ struct SplashMonitorApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
+        .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button(loc.isSpanish ? "Acerca de Splash Monitor" : "About Splash Monitor") {
+                    NotificationCenter.default.post(name: NSNotification.Name("ShowAboutView"), object: nil)
+                    NSApp.activate(ignoringOtherApps: true)
+                    for window in NSApp.windows where window.canBecomeMain {
+                        window.makeKeyAndOrderFront(nil)
+                    }
+                }
+            }
+        }
         
         MenuBarExtra(isInserted: $showMenuBarIcon) {
             MenuBarView(service: service)
