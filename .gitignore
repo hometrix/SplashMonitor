@@ -18,6 +18,8 @@ Icon
 # Application Bundles (Build artifacts)
 *.app/
 *.dSYM/
+*.dmg
+.dmg_temp/
 
 # User-specific
 xcuserdata/

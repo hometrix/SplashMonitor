@@ -46,31 +46,20 @@
 
 ---
 
-## 🚀 Instalación y Compilación / Installation & Build
+## 🚀 Instalación / Installation
 
 ### Requisitos / Prerequisites
 - Mac con **Apple Silicon** (M3, M4, M5 y versiones Pro/Max/Ultra).
 - macOS 13.0 o superior (optimizado para macOS 26 Tahoe).
 - Motor Splash instalado (`brew install incoai/tap/splash`).
 
-### Compilar y Ejecutar / Build and Run
-Clona este repositorio y ejecuta el script de empaquetado:
+### 📦 Descargar e Instalar (Instalador DMG)
+1. Descarga el instalador oficial **[SplashMonitor-1.0.0-beta.dmg](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.0-beta/SplashMonitor-1.0.0-beta.dmg)** desde la sección de [Releases de GitHub](https://github.com/hometrix/SplashMonitor/releases/latest).
+2. Haz doble clic en el archivo `.dmg` descargado.
+3. Arrastra **Splash Monitor** a la carpeta **Aplicaciones**.
+4. ¡Listo! Abre **Splash Monitor** directamente desde tu Launchpad, Spotlight o Aplicaciones.
 
-```bash
-git clone https://github.com/hometrix/SplashMonitor.git
-cd SplashMonitor
-./scripts/build_app.sh
-```
-
-Esto generará el bundle `Splash Monitor.app`. Para iniciarlo:
-```bash
-open "Splash Monitor.app"
-```
-
-Para instalarlo permanentemente en tu sistema:
-```bash
-cp -R "Splash Monitor.app" /Applications/
-```
+> 💡 *Nota para desarrolladores*: Si deseas compilar tú mismo la app, puedes clonar el repositorio y ejecutar `./scripts/build_app.sh` o `./scripts/create_dmg.sh`.
 
 ---
 
