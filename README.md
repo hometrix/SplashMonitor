@@ -134,9 +134,19 @@ brew install incoai/tap/splash
 
 Una vez que Splash esté instalado y funcionando, instala Splash Monitor:
 
-#### Opción A — Instalación en 1 Línea (Recomendada · Sin Alertas)
+#### Opción A — Homebrew Cask (Recomendada Oficial · Sin Alertas de Gatekeeper)
 
-La forma más rápida y limpia de instalar Splash Monitor sin pasar por las alertas de Gatekeeper:
+La forma nativa y recomendada en macOS. Al instalar mediante Homebrew, macOS no aplica cuarentena de navegador y la app abre de inmediato:
+
+```bash
+brew install --cask hometrix/tap/splash-monitor
+```
+
+---
+
+#### Opción B — Instalación en 1 Línea (Terminal / Script)
+
+La forma más rápida si no deseas usar Homebrew tap:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts/install.sh | bash
@@ -146,7 +156,7 @@ curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts
 
 ---
 
-#### Opción B — Descarga Manual del DMG
+#### Opción C — Descarga Manual del DMG
 
 1. **Descarga** el instalador oficial:
    👉 [**SplashMonitor-1.0.0-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.0-beta/SplashMonitor-1.0.0-beta.dmg) *(4.3 MB)*
@@ -403,9 +413,19 @@ brew install incoai/tap/splash
 
 Once Splash is installed and running, install Splash Monitor:
 
-#### Option A — 1-Line Quick Install (Recommended · Zero Prompts)
+#### Option A — Homebrew Cask (Recommended · Official · Zero Gatekeeper Prompts)
 
-The fastest and cleanest way to install Splash Monitor without macOS Gatekeeper warnings:
+The native macOS package manager method. When installed through Homebrew, macOS does not flag it with browser quarantine:
+
+```bash
+brew install --cask hometrix/tap/splash-monitor
+```
+
+---
+
+#### Option B — 1-Line Quick Install (Terminal / Script)
+
+The quickest method without tapping:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts/install.sh | bash
@@ -415,7 +435,7 @@ curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts
 
 ---
 
-#### Option B — Manual DMG Download
+#### Option C — Manual DMG Download
 
 1. **Download** the official installer:
    👉 [**SplashMonitor-1.0.0-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.0-beta/SplashMonitor-1.0.0-beta.dmg) *(4.3 MB)*
