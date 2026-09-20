@@ -277,29 +277,42 @@ public class SplashService: ObservableObject {
     }
     
     public func installSplashInTerminal() {
-        let script = """
-        tell application "Terminal"
-            do script "brew install incoai/tap/splash"
-            activate
-        end tell
+        let cmd = """
+        echo "🍺 Instalando Splash Engine via Homebrew..."
+        echo ""
+        brew install incoai/tap/splash
+        echo ""
+        echo "Instalación finalizada. Ya puedes cerrar esta ventana."
         """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-        }
+        runInTerminal(command: cmd, title: "Instalar Splash", scriptFileName: "install_splash.command")
     }
     
     public func upgradeSplashInTerminal() {
-        let script = """
-        tell application "Terminal"
-            do script "brew update && brew upgrade splash"
-            activate
-        end tell
+        let cmd = """
+        echo "🍺 Actualizando Splash Engine via Homebrew..."
+        echo ""
+        brew update && brew upgrade splash
+        echo ""
+        echo "Actualización finalizada. Ya puedes cerrar esta ventana."
         """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-        }
+        runInTerminal(command: cmd, title: "Actualizar Splash", scriptFileName: "upgrade_splash.command")
+    }
+    
+    private func runInTerminal(command: String, title: String, scriptFileName: String) {
+        try? FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
+        let scriptURL = dataDirectory.appendingPathComponent(scriptFileName)
+        let scriptContent = """
+        #!/bin/bash
+        printf "\\e]0;\(title)\\a"
+        \(command)
+        """
+        try? scriptContent.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+        
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        proc.arguments = ["-a", "Terminal", scriptURL.path]
+        try? proc.run()
     }
     
     // MARK: - Polling & Status Fetching
@@ -634,21 +647,24 @@ public class SplashService: ObservableObject {
     
     // MARK: - Server Control
     
-    public func stopServer() {
+    public func stopServerAsync() async {
         if let pid = activePid, pid > 0 {
-            // Send SIGINT first for graceful exit (Splash recommended)
             kill(pid_t(pid), SIGINT)
-            
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                if kill(pid_t(pid), 0) == 0 {
-                    kill(pid_t(pid), SIGTERM)
-                }
-                Task { @MainActor [weak self] in
-                    self?.cleanupLockAndProcess()
-                }
+            for _ in 0..<15 {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                if kill(pid_t(pid), 0) != 0 { break }
             }
-        } else {
-            cleanupLockAndProcess()
+            if kill(pid_t(pid), 0) == 0 {
+                kill(pid_t(pid), SIGTERM)
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+        }
+        cleanupLockAndProcess()
+    }
+    
+    public func stopServer() {
+        Task {
+            await stopServerAsync()
         }
     }
     
@@ -673,32 +689,36 @@ public class SplashService: ObservableObject {
             return
         }
         
-        stopServer()
-        
-        // Wait 400ms before starting new process to ensure port is freed
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            guard let self = self else { return }
-            let splashPath = self.splashExecutablePath
-            let script = """
-            tell application "Terminal"
-                do script "\(splashPath) serve --model \(model) --port \(port)"
-                activate
-            end tell
-            """
-            if let appleScript = NSAppleScript(source: script) {
-                var error: NSDictionary?
-                appleScript.executeAndReturnError(&error)
-                if let error = error {
-                    print("AppleScript error starting server: \(error)")
-                }
+        Task {
+            if isRunning {
+                await stopServerAsync()
+            } else {
+                cleanupLockAndProcess()
             }
             
-            Task {
-                for _ in 0..<12 {
-                    try? await Task.sleep(nanoseconds: 800_000_000)
-                    await self.checkServerStatus()
-                    if self.isRunning { break }
-                }
+            let splashPath = self.splashExecutablePath
+            let cmd = """
+            echo "🌊 ==============================================="
+            echo "🚀 Iniciando Servidor Splash..."
+            echo "📦 Modelo: \(model)"
+            echo "🔌 Puerto: \(port)"
+            echo "⚡️ Motor:  \(splashPath)"
+            echo "==============================================="
+            echo "Presiona Ctrl+C en esta ventana para detener el servidor."
+            echo ""
+            exec "\(splashPath)" serve --model "\(model)" --port "\(port)"
+            """
+            
+            self.runInTerminal(
+                command: cmd,
+                title: "Splash Server - \(model)",
+                scriptFileName: "start_splash.command"
+            )
+            
+            for _ in 0..<15 {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                await self.checkServerStatus()
+                if self.isRunning { break }
             }
         }
     }
@@ -754,16 +774,18 @@ public class SplashService: ObservableObject {
         }
         
         let splashPath = splashExecutablePath
-        let script = """
-        tell application "Terminal"
-            do script "\(splashPath) \(agent)"
-            activate
-        end tell
+        let cmd = """
+        echo "🤖 ==============================================="
+        echo "⚡️ Conectando agente \(agent) al servidor Splash..."
+        echo "==============================================="
+        echo ""
+        exec "\(splashPath)" "\(agent)"
         """
-        if let appleScript = NSAppleScript(source: script) {
-            var error: NSDictionary?
-            appleScript.executeAndReturnError(&error)
-        }
+        runInTerminal(
+            command: cmd,
+            title: "Splash Agent - \(agent)",
+            scriptFileName: "launch_\(agent).command"
+        )
     }
     
     // MARK: - Formatting Helpers

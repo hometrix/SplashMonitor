@@ -68,6 +68,8 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
     <true/>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Splash Monitor utiliza Terminal para ejecutar el motor de inferencia local Splash y conectar agentes de código.</string>
 </dict>
 </plist>
 EOF
