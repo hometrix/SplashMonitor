@@ -98,8 +98,14 @@ public struct MainWindowView: View {
                         HStack(spacing: 4) {
                             Text(loc.isSpanish ? "🇩🇴 ES" : "🇬🇧 EN")
                                 .font(.system(size: 11, weight: .bold))
-                            Image(systemName: "globe")
-                                .font(.system(size: 11))
+                            if loc.isSystemMode {
+                                Image(systemName: "applelogo")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Image(systemName: "globe")
+                                    .font(.system(size: 10))
+                            }
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -107,7 +113,7 @@ public struct MainWindowView: View {
                         .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
-                    .help(loc.isSpanish ? "Cambiar idioma (Español / English)" : "Switch language (English / Spanish)")
+                    .help(loc.isSpanish ? "Cambiar idioma (macOS / Español / English)" : "Switch language (macOS / English / Spanish)")
                     
                     Spacer()
                     
@@ -240,17 +246,23 @@ public struct MainWindowView: View {
             
             Divider()
             
-            // Language selection
+            // Language Settings
             VStack(alignment: .leading, spacing: 8) {
-                Text(loc.isSpanish ? "Idioma / Language" : "Language / Idioma")
+                Text(loc.isSpanish ? "Idioma de la Aplicación" : "Application Language")
                     .font(.system(size: 13, weight: .semibold))
                 
-                Picker("", selection: $loc.currentLanguage) {
-                    Text("🇩🇴 Español").tag("es")
+                Picker("", selection: $loc.languageMode) {
+                    let sysLang = Localization.detectSystemLanguage() == "es" ? "Español" : "English"
+                    Text("\(loc.isSpanish ? "Automático (macOS: " : "Automatic (macOS: ")\(sysLang))").tag("system")
+                    Text("🇩🇴 Español (República Dominicana)").tag("es")
                     Text("🇬🇧 English").tag("en")
                 }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 240)
+                .pickerStyle(.radioGroup)
+                .font(.system(size: 11))
+                
+                Text(loc.isSpanish ? "Sincroniza automáticamente con el idioma configurado en tu macOS o permite fijar uno manualmente." : "Automatically syncs with macOS system language or lets you choose manually.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
             .padding(14)
             .background(Color(nsColor: .controlBackgroundColor))

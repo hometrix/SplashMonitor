@@ -37,6 +37,11 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
 <dict>
     <key>CFBundleDevelopmentRegion</key>
     <string>es</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>es</string>
+        <string>en</string>
+    </array>
     <key>CFBundleExecutable</key>
     <string>SplashMonitor</string>
     <key>CFBundleIconFile</key>
