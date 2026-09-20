@@ -142,15 +142,25 @@ public struct ModelManagerView: View {
                                     Button {
                                         service.switchModel(to: model.repoId)
                                     } label: {
-                                        Label(
-                                            service.isRunning ? tr(es: "Cambiar", en: "Switch") : tr(es: "Arrancar", en: "Start"),
-                                            systemImage: service.isRunning ? "arrow.triangle.2.circlepath" : "play.fill"
-                                        )
-                                        .font(.system(size: 10, weight: .semibold))
+                                        if service.isStartingServer && service.startingModelId == model.repoId {
+                                            HStack(spacing: 5) {
+                                                ProgressView()
+                                                    .controlSize(.mini)
+                                                Text(service.isRunning ? tr(es: "Cambiando...", en: "Switching...") : tr(es: "Iniciando...", en: "Starting..."))
+                                                    .font(.system(size: 10, weight: .semibold))
+                                            }
+                                        } else {
+                                            Label(
+                                                service.isRunning ? tr(es: "Cambiar", en: "Switch") : tr(es: "Arrancar", en: "Start"),
+                                                systemImage: service.isRunning ? "arrow.triangle.2.circlepath" : "play.fill"
+                                            )
+                                            .font(.system(size: 10, weight: .semibold))
+                                        }
                                     }
                                     .buttonStyle(.borderedProminent)
                                     .tint(service.isRunning ? .purple : .green)
                                     .controlSize(.small)
+                                    .disabled(service.isStartingServer)
                                 }
                             }
                             .padding(8)

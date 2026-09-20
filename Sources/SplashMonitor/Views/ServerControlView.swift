@@ -270,7 +270,18 @@ public struct ServerControlView: View {
                 let targetPort = Int(portString) ?? service.activePort
                 let isSameAsActive = (targetModel == service.activeModel && service.isRunning)
                 
-                if service.isRunning {
+                if service.isStartingServer {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text(tr(es: "Iniciando Servidor...", en: "Starting Server..."))
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.green.opacity(0.15))
+                    .cornerRadius(6)
+                } else if service.isRunning {
                     if isSameAsActive {
                         Button {
                             service.switchModel(to: targetModel)

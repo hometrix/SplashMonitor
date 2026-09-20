@@ -35,6 +35,10 @@ public class SplashService: ObservableObject {
     @Published public var installLogs: [String] = []
     @Published public var installSuccess: Bool? = nil
     
+    // Server Launching state
+    @Published public var isStartingServer: Bool = false
+    @Published public var startingModelId: String? = nil
+    
     // Performance history for graphing
     @Published public var speedHistory: [Double] = []
     
@@ -313,6 +317,12 @@ public class SplashService: ObservableObject {
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         proc.arguments = ["-a", "Terminal", scriptURL.path]
         try? proc.run()
+        
+        // Also bring Terminal window to foreground
+        let actProc = Process()
+        actProc.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        actProc.arguments = ["-e", "tell application \"Terminal\" to activate"]
+        try? actProc.run()
     }
     
     // MARK: - Polling & Status Fetching
@@ -648,18 +658,10 @@ public class SplashService: ObservableObject {
     // MARK: - Server Control
     
     public func stopServerAsync() async {
-        if let pid = activePid, pid > 0 {
-            kill(pid_t(pid), SIGINT)
-            for _ in 0..<15 {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                if kill(pid_t(pid), 0) != 0 { break }
-            }
-            if kill(pid_t(pid), 0) == 0 {
-                kill(pid_t(pid), SIGTERM)
-                try? await Task.sleep(nanoseconds: 200_000_000)
-            }
-        }
-        cleanupLockAndProcess()
+        await killSplashProcesses(port: activePort)
+        self.isRunning = false
+        self.status = nil
+        self.activePid = nil
     }
     
     public func stopServer() {
@@ -668,19 +670,95 @@ public class SplashService: ObservableObject {
         }
     }
     
-    private func cleanupLockAndProcess() {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        proc.arguments = ["-f", "splash serve"]
-        try? proc.run()
-        proc.waitUntilExit()
+    public func killSplashProcesses(port: Int) async {
+        // 1. Send SIGINT to activePid or PID in serve.lock for graceful exit
+        var targetPids: Set<Int32> = []
+        if let p = activePid, p > 0 { targetPids.insert(Int32(p)) }
+        if let lockPid = readLockPid(), lockPid > 0 { targetPids.insert(Int32(lockPid)) }
         
+        for p in targetPids {
+            kill(p, SIGINT)
+        }
+        
+        // 2. Also send SIGINT to python server.py and native engine
+        runPkill(pattern: "server.py", signal: "-INT")
+        runPkill(pattern: "libexec/engine/splash", signal: "-INT")
+        runPkill(pattern: "splash serve", signal: "-INT")
+        
+        // 3. Wait up to 3 seconds for port to become free
+        for _ in 0..<30 {
+            if !isPortListening(port: port) { break }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        
+        // 4. Force kill if still lingering
+        if isPortListening(port: port) {
+            runPkill(pattern: "server.py", signal: "-9")
+            runPkill(pattern: "libexec/engine/splash", signal: "-9")
+            killProcessesOnPort(port: port)
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        
+        // 5. Clean lock file
         if FileManager.default.fileExists(atPath: lockFileURL.path) {
             try? FileManager.default.removeItem(at: lockFileURL)
         }
-        self.isRunning = false
-        self.status = nil
-        self.activePid = nil
+    }
+    
+    private func runPkill(pattern: String, signal: String) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        proc.arguments = [signal, "-f", pattern]
+        try? proc.run()
+        proc.waitUntilExit()
+    }
+    
+    private func readLockPid() -> Int? {
+        guard FileManager.default.fileExists(atPath: lockFileURL.path),
+              let data = try? Data(contentsOf: lockFileURL),
+              let lock = try? JSONDecoder().decode(ServeLock.self, from: data) else {
+            return nil
+        }
+        return lock.pid
+    }
+    
+    private func killProcessesOnPort(port: Int) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        proc.arguments = ["-ti", ":\(port)"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        try? proc.run()
+        proc.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        if let output = String(data: data, encoding: .utf8) {
+            let pids = output.components(separatedBy: .whitespacesAndNewlines).compactMap { Int32($0) }
+            for p in pids where p > 0 {
+                kill(p, SIGKILL)
+            }
+        }
+    }
+    
+    private func isPortListening(port: Int) -> Bool {
+        var addr = sockaddr_in()
+        addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.stride)
+        addr.sin_family = sa_family_t(AF_INET)
+        addr.sin_port = in_port_t(port).bigEndian
+        inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr)
+        
+        let sock = socket(AF_INET, SOCK_STREAM, 0)
+        guard sock >= 0 else { return false }
+        defer { close(sock) }
+        
+        var yes: Int32 = 1
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, socklen_t(MemoryLayout<Int32>.size))
+        
+        let result = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                Darwin.bind(sock, $0, socklen_t(MemoryLayout<sockaddr_in>.stride))
+            }
+        }
+        return result != 0
     }
     
     public func startServer(model: String, port: Int = 8005) {
@@ -689,12 +767,13 @@ public class SplashService: ObservableObject {
             return
         }
         
+        self.isStartingServer = true
+        self.startingModelId = model
+        self.selectedModelForLaunch = model
+        
         Task {
-            if isRunning {
-                await stopServerAsync()
-            } else {
-                cleanupLockAndProcess()
-            }
+            // Ensure any existing splash process or port collision is cleared
+            await killSplashProcesses(port: port)
             
             let splashPath = self.splashExecutablePath
             let cmd = """
@@ -706,7 +785,14 @@ public class SplashService: ObservableObject {
             echo "==============================================="
             echo "Presiona Ctrl+C en esta ventana para detener el servidor."
             echo ""
-            exec "\(splashPath)" serve --model "\(model)" --port "\(port)"
+            "\(splashPath)" serve --model "\(model)" --port "\(port)"
+            EXIT_CODE=$?
+            if [ $EXIT_CODE -ne 0 ]; then
+                echo ""
+                echo "⚠️ Splash finalizó con código de salida: $EXIT_CODE"
+                echo "Presiona Enter para cerrar esta ventana..."
+                read -r
+            fi
             """
             
             self.runInTerminal(
@@ -715,11 +801,15 @@ public class SplashService: ObservableObject {
                 scriptFileName: "start_splash.command"
             )
             
-            for _ in 0..<15 {
+            // Poll for up to 30 intervals (24 seconds) to detect server startup
+            for _ in 0..<30 {
                 try? await Task.sleep(nanoseconds: 800_000_000)
                 await self.checkServerStatus()
                 if self.isRunning { break }
             }
+            
+            self.isStartingServer = false
+            self.startingModelId = nil
         }
     }
     
