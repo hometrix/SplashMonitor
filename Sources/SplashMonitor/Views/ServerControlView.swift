@@ -12,6 +12,7 @@ public struct ServerControlView: View {
     // Agent alert state
     @State private var showingAgentOfflineAlert: Bool = false
     @State private var showingAgentNotInstalledAlert: Bool = false
+    @State private var showingLogsSheet: Bool = false
     @State private var pendingAgentName: String = ""
     @State private var pendingAgentCommand: String = ""
     
@@ -95,6 +96,32 @@ public struct ServerControlView: View {
                     service.resolvePortConflict(killProcess: true)
                 }
             )
+        }
+        .sheet(isPresented: $showingLogsSheet) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label(tr(es: "Registros del Servidor Splash", en: "Splash Server Logs"), systemImage: "terminal.fill")
+                        .font(.system(size: 13, weight: .bold))
+                    Spacer()
+                    Button(tr(es: "Cerrar", en: "Close")) {
+                        showingLogsSheet = false
+                    }
+                    .buttonStyle(.bordered)
+                }
+                
+                let logs = service.readRecentServerLogs(lines: 100)
+                ScrollView {
+                    Text(logs.isEmpty ? tr(es: "No hay registros disponibles aún.", en: "No logs available yet.") : logs)
+                        .font(.system(size: 10, design: .monospaced))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .cornerRadius(6)
+                }
+                .frame(minHeight: 280, maxHeight: 420)
+            }
+            .padding(16)
+            .frame(width: 580)
         }
     }
     
@@ -370,6 +397,34 @@ public struct ServerControlView: View {
                     .disabled(targetModel.isEmpty)
                 }
             }
+            
+            // Background / Silent mode & logs options
+            HStack {
+                Toggle(isOn: $service.runInBackground) {
+                    HStack(spacing: 4) {
+                        Image(systemName: service.runInBackground ? "speaker.slash.fill" : "terminal")
+                            .font(.system(size: 10))
+                        Text(tr(es: "Ejecutar en silencio (segundo plano)", en: "Run silently in background"))
+                            .font(.system(size: 11))
+                    }
+                }
+                .toggleStyle(.checkbox)
+                
+                Spacer()
+                
+                Button {
+                    showingLogsSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                        Text(tr(es: "Ver Registros", en: "View Logs"))
+                    }
+                    .font(.system(size: 11))
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.blue)
+            }
+            .padding(.top, 4)
         }
         .padding(10)
         .background(Color(nsColor: .controlBackgroundColor))

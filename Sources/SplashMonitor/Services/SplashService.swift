@@ -63,6 +63,7 @@ public class SplashService: ObservableObject {
     // Settings
     @AppStorage("refreshInterval") public var refreshInterval: Double = 1.5
     @AppStorage("menuBarDisplayMode") public var menuBarDisplayMode: String = "speed" // "icon", "speed", "tokens", "model"
+    @AppStorage("runInBackground") public var runInBackground: Bool = true
     
     // Timers & Processes
     private var timer: Timer?
@@ -85,6 +86,20 @@ public class SplashService: ObservableObject {
     
     public var splashLauncherScriptURL: URL {
         dataDirectory.appendingPathComponent("splash_launcher.py")
+    }
+    
+    public var serverLogURL: URL {
+        dataDirectory.appendingPathComponent("logs/server.log")
+    }
+    
+    public func readRecentServerLogs(lines: Int = 100) -> String {
+        guard let data = try? Data(contentsOf: serverLogURL),
+              let text = String(data: data, encoding: .utf8) else {
+            return ""
+        }
+        let allLines = text.components(separatedBy: .newlines)
+        let slice = allLines.suffix(lines)
+        return slice.joined(separator: "\n")
     }
     
     public var brewExecutablePath: String? {
@@ -1013,11 +1028,31 @@ public class SplashService: ObservableObject {
             fi
             """
             
-            self.runInTerminal(
-                command: cmd,
-                title: "Splash Server - \(model)",
-                scriptFileName: "start_splash.command"
-            )
+            if self.runInBackground {
+                let logsDir = self.dataDirectory.appendingPathComponent("logs")
+                try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+                let logFileURL = self.serverLogURL
+                
+                let scriptURL = self.dataDirectory.appendingPathComponent("start_splash.command")
+                let fullScript = """
+                #!/bin/bash
+                \(cmd)
+                """
+                try? fullScript.write(to: scriptURL, atomically: true, encoding: .utf8)
+                try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+                
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/bin/bash")
+                proc.arguments = ["-c", "\"\(scriptURL.path)\" > \"\(logFileURL.path)\" 2>&1 &"]
+                try? proc.run()
+                proc.waitUntilExit()
+            } else {
+                self.runInTerminal(
+                    command: cmd,
+                    title: "Splash Server - \(model)",
+                    scriptFileName: "start_splash.command"
+                )
+            }
             
             // Poll for up to 30 intervals (24 seconds) to detect server startup
             for _ in 0..<30 {
