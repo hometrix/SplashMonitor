@@ -78,6 +78,24 @@ public struct ServerControlView: View {
                 en: "Command '\(pendingAgentCommand)' was not detected on your system. You can install it following the official guide."
             ))
         }
+        .alert(
+            item: $service.portConflict
+        ) { conflict in
+            Alert(
+                title: Text(tr(es: "⚠️ Puerto \(conflict.port) en Uso", en: "⚠️ Port \(conflict.port) In Use")),
+                message: Text(tr(
+                    es: "El proceso '\(conflict.processName)' (PID \(conflict.pid)) está utilizando el puerto \(conflict.port).\n\n¿Deseas cambiar al puerto libre sugerido \(conflict.suggestedPort) o liberar el puerto \(conflict.port)?",
+                    en: "Process '\(conflict.processName)' (PID \(conflict.pid)) is currently using port \(conflict.port).\n\nWould you like to switch to suggested free port \(conflict.suggestedPort) or free port \(conflict.port)?"
+                )),
+                primaryButton: .default(Text(tr(es: "Usar puerto \(conflict.suggestedPort)", en: "Use port \(conflict.suggestedPort)"))) {
+                    portString = "\(conflict.suggestedPort)"
+                    service.useSuggestedPort(conflict.suggestedPort)
+                },
+                secondaryButton: .destructive(Text(tr(es: "Liberar puerto \(conflict.port)", en: "Free port \(conflict.port)"))) {
+                    service.resolvePortConflict(killProcess: true)
+                }
+            )
+        }
     }
     
     // MARK: - 0. Dependency Warning Banner
@@ -263,6 +281,42 @@ public struct ServerControlView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11, design: .monospaced))
                     .frame(width: 65)
+                
+                Button {
+                    let suggested = service.findSuggestedFreePort()
+                    portString = "\(suggested)"
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "sparkles")
+                        Text(tr(es: "Sugerir libre", en: "Suggest free"))
+                    }
+                    .font(.system(size: 10))
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.blue)
+                .help(tr(es: "Escanear y sugerir automáticamente un puerto libre en tu sistema", en: "Scan and automatically suggest a free port on your system"))
+                
+                if let p = Int(portString) {
+                    if service.isPortListening(port: p) && (!service.isRunning || p != service.activePort) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(.orange)
+                            Text(tr(es: "En uso", en: "In use"))
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                    } else {
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(.green)
+                            Text(tr(es: "Libre", en: "Free"))
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
                 
                 Spacer()
                 

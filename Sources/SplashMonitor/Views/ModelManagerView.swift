@@ -58,6 +58,23 @@ public struct ModelManagerView: View {
                 en: "Are you sure you want to delete '\(model.shortName)'? It will be unlinked from the Splash engine to free up disk space (\(model.formattedSize))."
             ))
         }
+        .alert(
+            item: $service.portConflict
+        ) { conflict in
+            Alert(
+                title: Text(tr(es: "⚠️ Puerto \(conflict.port) en Uso", en: "⚠️ Port \(conflict.port) In Use")),
+                message: Text(tr(
+                    es: "El proceso '\(conflict.processName)' (PID \(conflict.pid)) está utilizando el puerto \(conflict.port).\n\n¿Deseas cambiar al puerto libre sugerido \(conflict.suggestedPort) o liberar el puerto \(conflict.port)?",
+                    en: "Process '\(conflict.processName)' (PID \(conflict.pid)) is currently using port \(conflict.port).\n\nWould you like to switch to suggested free port \(conflict.suggestedPort) or free port \(conflict.port)?"
+                )),
+                primaryButton: .default(Text(tr(es: "Usar puerto \(conflict.suggestedPort)", en: "Use port \(conflict.suggestedPort)"))) {
+                    service.useSuggestedPort(conflict.suggestedPort)
+                },
+                secondaryButton: .destructive(Text(tr(es: "Liberar puerto \(conflict.port)", en: "Free port \(conflict.port)"))) {
+                    service.resolvePortConflict(killProcess: true)
+                }
+            )
+        }
     }
     
     // MARK: - Installed Models Tab

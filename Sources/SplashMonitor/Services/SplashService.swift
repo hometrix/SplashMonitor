@@ -3,6 +3,23 @@ import Combine
 import SwiftUI
 import AppKit
 
+// MARK: - Port Conflict Model
+
+public struct PortConflictInfo: Identifiable, Equatable {
+    public var id: String { "\(port)-\(pid)" }
+    public let port: Int
+    public let processName: String
+    public let pid: Int32
+    public let suggestedPort: Int
+    
+    public init(port: Int, processName: String, pid: Int32, suggestedPort: Int) {
+        self.port = port
+        self.processName = processName
+        self.pid = pid
+        self.suggestedPort = suggestedPort
+    }
+}
+
 @MainActor
 public class SplashService: ObservableObject {
     public static let shared = SplashService()
@@ -11,6 +28,7 @@ public class SplashService: ObservableObject {
     @Published public var isRunning: Bool = false
     @Published public var activePid: Int? = nil
     @Published public var activePort: Int = 8000
+    @Published public var portConflict: PortConflictInfo? = nil
     @Published public var activeModel: String = "Ninguno"
     @Published public var status: SplashStatus? = nil
     @Published public var lastError: String? = nil
@@ -63,6 +81,10 @@ public class SplashService: ObservableObject {
     
     public var lockFileURL: URL {
         dataDirectory.appendingPathComponent("runtime/serve.lock")
+    }
+    
+    public var splashLauncherScriptURL: URL {
+        dataDirectory.appendingPathComponent("splash_launcher.py")
     }
     
     public var brewExecutablePath: String? {
@@ -739,7 +761,7 @@ public class SplashService: ObservableObject {
         }
     }
     
-    private func isPortListening(port: Int) -> Bool {
+    public func isPortListening(port: Int) -> Bool {
         var addr = sockaddr_in()
         addr.sin_len = UInt8(MemoryLayout<sockaddr_in>.stride)
         addr.sin_family = sa_family_t(AF_INET)
@@ -761,21 +783,217 @@ public class SplashService: ObservableObject {
         return result != 0
     }
     
+    public func findSuggestedFreePort(preferred: Int? = nil) -> Int {
+        var candidates: [Int] = []
+        if let pref = preferred, pref > 1024, pref <= 65535 {
+            candidates.append(pref)
+        }
+        for p in [8000, 8001, 8005, 8008, 8080, 8088, 8888, 9000, 9005] {
+            if !candidates.contains(p) {
+                candidates.append(p)
+            }
+        }
+        for port in candidates {
+            if !isPortListening(port: port) {
+                return port
+            }
+        }
+        for p in 8001...8100 {
+            if !isPortListening(port: p) {
+                return p
+            }
+        }
+        return 8000
+    }
+    
+    public func detectPortConflict(port: Int) -> PortConflictInfo? {
+        guard isPortListening(port: port) else { return nil }
+        
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        proc.arguments = ["-iTCP:\(port)", "-sTCP:LISTEN", "-t"]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        try? proc.run()
+        proc.waitUntilExit()
+        
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        guard let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let firstLine = output.components(separatedBy: .newlines).first,
+              let pid = Int32(firstLine), pid > 0 else {
+            return nil
+        }
+        
+        if let currentSplashPid = activePid, Int32(currentSplashPid) == pid {
+            return nil
+        }
+        if let lockPid = readLockPid(), Int32(lockPid) == pid {
+            return nil
+        }
+        
+        let psProc = Process()
+        psProc.executableURL = URL(fileURLWithPath: "/bin/ps")
+        psProc.arguments = ["-p", "\(pid)", "-o", "comm="]
+        let psPipe = Pipe()
+        psProc.standardOutput = psPipe
+        try? psProc.run()
+        psProc.waitUntilExit()
+        
+        let psData = psPipe.fileHandleForReading.readDataToEndOfFile()
+        let rawComm = (String(data: psData, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawComm.localizedCaseInsensitiveContains("splash") {
+            return nil
+        }
+        
+        var friendlyName = (rawComm as NSString).lastPathComponent
+        if friendlyName.isEmpty { friendlyName = "Proceso desconocido" }
+        
+        let suggested = findSuggestedFreePort(preferred: port == 8000 ? 8001 : port + 1)
+        return PortConflictInfo(port: port, processName: friendlyName, pid: pid, suggestedPort: suggested)
+    }
+    
+    public func resolvePortConflict(killProcess: Bool) {
+        guard let conflict = portConflict else { return }
+        let targetPort = conflict.port
+        self.portConflict = nil
+        if killProcess {
+            kill(conflict.pid, SIGKILL)
+            usleep(250_000)
+            startServer(model: selectedModelForLaunch, port: targetPort)
+        } else {
+            self.isStartingServer = false
+            self.startingModelId = nil
+        }
+    }
+    
+    public func useSuggestedPort(_ newPort: Int) {
+        self.portConflict = nil
+        self.activePort = newPort
+        startServer(model: selectedModelForLaunch, port: newPort)
+    }
+    
+    public func ensureSplashLauncherScript() {
+        try? FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
+        let scriptURL = splashLauncherScriptURL
+        let scriptContent = """
+        #!/usr/bin/env python3
+        \"\"\"
+        Splash Bridge Launcher for Splash Monitor.
+        Enables dynamic port configuration and seamless agent connectivity.
+        \"\"\"
+        import sys
+        import os
+
+        target_port = 8000
+        new_argv = [sys.argv[0]]
+        skip_next = False
+        for i, arg in enumerate(sys.argv[1:]):
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "--port":
+                if i + 2 < len(sys.argv):
+                    try:
+                        target_port = int(sys.argv[i + 2])
+                    except ValueError:
+                        pass
+                    skip_next = True
+                continue
+            if arg.startswith("--port="):
+                try:
+                    target_port = int(arg.split("=", 1)[1])
+                except ValueError:
+                    pass
+                continue
+            new_argv.append(arg)
+
+        if "SPLASH_PORT" in os.environ:
+            try:
+                target_port = int(os.environ["SPLASH_PORT"])
+            except ValueError:
+                pass
+
+        install_dir = None
+        for candidate in [
+            "/opt/homebrew/opt/splash/libexec/install",
+            "/usr/local/opt/splash/libexec/install",
+            "/opt/homebrew/Cellar/splash/1.0/libexec/install",
+            "/usr/local/Cellar/splash/1.0/libexec/install"
+        ]:
+            if os.path.isdir(candidate):
+                install_dir = candidate
+                break
+
+        if not install_dir:
+            os.execv("/opt/homebrew/bin/splash", new_argv)
+
+        sys.path.insert(0, install_dir)
+        import launcher
+
+        launcher.PORT = target_port
+        launcher.BASE_URL = f"http://127.0.0.1:{target_port}"
+
+        orig_execve = os.execve
+        def custom_execve(path, argv, env):
+            joined = " ".join(argv)
+            if "server/server.py" in joined or "server.py" in joined:
+                if "--port" not in argv:
+                    argv.extend(["--port", str(target_port)])
+            return orig_execve(path, argv, env)
+
+        os.execve = custom_execve
+        sys.argv = new_argv
+        try:
+            sys.exit(launcher.main())
+        except SystemExit as e:
+            sys.exit(e.code)
+        """
+        try? scriptContent.write(to: scriptURL, atomically: true, encoding: .utf8)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
+    }
+    
     public func startServer(model: String, port: Int = 8000) {
         guard isSplashInstalled else {
             installSplashDependency()
             return
         }
         
-        self.isStartingServer = true
-        self.startingModelId = model
+        self.activePort = port
         self.selectedModelForLaunch = model
         
+        // 1. Pre-flight check for port conflict with third-party software
+        if let conflict = detectPortConflict(port: port) {
+            self.portConflict = conflict
+            self.isStartingServer = false
+            self.startingModelId = nil
+            return
+        }
+        
+        self.isStartingServer = true
+        self.startingModelId = model
+        
         Task {
-            // Ensure any existing splash process or port collision is cleared
+            // Clean up any stale lock file if the process died
+            if let lockPid = self.readLockPid() {
+                if kill(Int32(lockPid), 0) != 0 {
+                    try? FileManager.default.removeItem(at: self.lockFileURL)
+                }
+            }
+            
+            // Ensure any existing splash process on this port is cleared
             await killSplashProcesses(port: port)
             
             let splashPath = self.splashExecutablePath
+            let runCmd: String
+            if port == 8000 {
+                runCmd = "\"\(splashPath)\" serve --model \"\(model)\""
+            } else {
+                self.ensureSplashLauncherScript()
+                let pythonPath = self.splashPythonPath
+                let launcherPath = self.splashLauncherScriptURL.path
+                runCmd = "\"\(pythonPath)\" \"\(launcherPath)\" serve --model \"\(model)\" --port \"\(port)\""
+            }
+            
             let cmd = """
             echo "🌊 ==============================================="
             echo "🚀 Iniciando Servidor Splash..."
@@ -785,7 +1003,7 @@ public class SplashService: ObservableObject {
             echo "==============================================="
             echo "Presiona Ctrl+C en esta ventana para detener el servidor."
             echo ""
-            "\(splashPath)" serve --model "\(model)"
+            \(runCmd)
             EXIT_CODE=$?
             if [ $EXIT_CODE -ne 0 ]; then
                 echo ""
@@ -864,12 +1082,31 @@ public class SplashService: ObservableObject {
         }
         
         let splashPath = splashExecutablePath
+        let port = self.activePort
+        let agentRunCommand: String
+        
+        if port == 8000 {
+            agentRunCommand = "exec \"\(splashPath)\" \"\(agent)\""
+        } else {
+            ensureSplashLauncherScript()
+            let launcherPath = splashLauncherScriptURL.path
+            let pythonPath = splashPythonPath
+            agentRunCommand = """
+            export ANTHROPIC_BASE_URL="http://127.0.0.1:\(port)"
+            export OPENAI_BASE_URL="http://127.0.0.1:\(port)/v1"
+            export CUSTOM_BASE_URL="http://127.0.0.1:\(port)/v1"
+            export SPLASH_PORT="\(port)"
+            exec "\(pythonPath)" "\(launcherPath)" "\(agent)" --port "\(port)"
+            """
+        }
+        
         let cmd = """
         echo "🤖 ==============================================="
         echo "⚡️ Conectando agente \(agent) al servidor Splash..."
+        echo "🔌 Puerto: \(port)"
         echo "==============================================="
         echo ""
-        exec "\(splashPath)" "\(agent)"
+        \(agentRunCommand)
         """
         runInTerminal(
             command: cmd,

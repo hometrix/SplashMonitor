@@ -547,6 +547,24 @@ Contributions are welcome! Please read our guidelines before participating:
 
 ---
 
+### 🛠️ Solución de Problemas (Troubleshooting)
+
+#### 1. Conflicto de Puerto (Puerto 8000 en uso)
+Si el puerto predeterminado 8000 está ocupado por otro servicio de tu Mac (como Uvicorn, Django, Docker o Node.js):
+- **Opción A (Automática):** En el panel de control del servidor, pulsa el botón ✨ **"Sugerir libre"** para que Splash Monitor asigne automáticamente el siguiente puerto disponible (ej. 8001 o 8005).
+- **Opción B (Personalizada):** Escribe manualmente el puerto que desees en el campo de texto. Splash Monitor utilizará su *Bridge Launcher* para ejecutar Splash en el puerto elegido sin errores.
+- **Opción C (Liberar puerto):** Si intentas arrancar en un puerto ocupado, la app te mostrará qué proceso lo tiene tomado y te ofrecerá un botón para liberarlo con un solo clic.
+
+#### 2. Agentes de Código (`splash claude`, OpenCode, Codex, Hermes)
+Si al ejecutar `splash claude` en tu terminal ves el mensaje:
+> `error: No ready Splash server. Run 'splash serve --model <HF_REPO_ID>' in another terminal first.`
+
+Asegúrate de que:
+1. El servidor Splash esté iniciado y con su modelo cargado (verás el estado en verde en Splash Monitor).
+2. Si ejecutaste el servidor en un puerto personalizado (distinto de 8000), lanza el agente directamente desde los botones de Splash Monitor para que la app configure automáticamente las variables de entorno de conexión (`ANTHROPIC_BASE_URL`, `SPLASH_PORT`).
+
+---
+
 ### 👤 Author & Credits
 
 <table>
