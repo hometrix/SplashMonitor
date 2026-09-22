@@ -64,6 +64,7 @@ public class SplashService: ObservableObject {
     @AppStorage("refreshInterval") public var refreshInterval: Double = 1.5
     @AppStorage("menuBarDisplayMode") public var menuBarDisplayMode: String = "speed" // "icon", "speed", "tokens", "model"
     @AppStorage("runInBackground") public var runInBackground: Bool = true
+    @AppStorage("lastUsedPort") public var lastUsedPort: Int = 8000
     
     // Timers & Processes
     private var timer: Timer?
@@ -82,10 +83,6 @@ public class SplashService: ObservableObject {
     
     public var lockFileURL: URL {
         dataDirectory.appendingPathComponent("runtime/serve.lock")
-    }
-    
-    public var splashLauncherScriptURL: URL {
-        dataDirectory.appendingPathComponent("splash_launcher.py")
     }
     
     public var serverLogURL: URL {
@@ -126,14 +123,13 @@ public class SplashService: ObservableObject {
     public var splashPythonPath: String {
         let candidates = [
             "/opt/homebrew/opt/splash/libexec/python/bin/python3",
-            "/usr/local/opt/splash/libexec/python/bin/python3",
-            "/opt/homebrew/Cellar/splash/1.0/libexec/python/bin/python3",
-            "/usr/local/Cellar/splash/1.0/libexec/python/bin/python3"
+            "/usr/local/opt/splash/libexec/python/bin/python3"
         ]
         for p in candidates where FileManager.default.fileExists(atPath: p) {
             return p
         }
         
+        // Wildcard search for any Cellar version
         let fm = FileManager.default
         let cellarRoots = ["/opt/homebrew/Cellar/splash", "/usr/local/Cellar/splash"]
         for root in cellarRoots where fm.fileExists(atPath: root) {
@@ -152,14 +148,13 @@ public class SplashService: ObservableObject {
     public var splashModelsScriptPath: String {
         let candidates = [
             "/opt/homebrew/opt/splash/libexec/install/models.py",
-            "/usr/local/opt/splash/libexec/install/models.py",
-            "/opt/homebrew/Cellar/splash/1.0/libexec/install/models.py",
-            "/usr/local/Cellar/splash/1.0/libexec/install/models.py"
+            "/usr/local/opt/splash/libexec/install/models.py"
         ]
         for p in candidates where FileManager.default.fileExists(atPath: p) {
             return p
         }
         
+        // Wildcard search for any Cellar version
         let fm = FileManager.default
         let cellarRoots = ["/opt/homebrew/Cellar/splash", "/usr/local/Cellar/splash"]
         for root in cellarRoots where fm.fileExists(atPath: root) {
@@ -176,6 +171,7 @@ public class SplashService: ObservableObject {
     }
     
     public init() {
+        self.activePort = lastUsedPort
         checkDependencies()
         startPolling()
         refreshInstalledModels()
@@ -440,14 +436,20 @@ public class SplashService: ObservableObject {
                     self.speedHistory.removeFirst()
                 }
                 self.lastError = nil
+                
+                // Sync shell env if port changed (e.g. after brew upgrade)
+                if self.activePort != self.lastUsedPort {
+                    self.lastUsedPort = self.activePort
+                    self.syncShellEnvironment(port: self.activePort)
+                }
             } else {
                 self.isRunning = false
                 self.status = nil
             }
         } catch {
-            // Fallback to port 8005 if 8000 failed and lock file wasn't present
-            if lockPid == nil && activePort == 8000 {
-                await tryFallbackPort8005()
+            // Fallback: scan flexible de puertos si el lock file no existe
+            if lockPid == nil {
+                await scanAndConnectPort()
             } else {
                 self.isRunning = false
                 self.status = nil
@@ -458,21 +460,30 @@ public class SplashService: ObservableObject {
         refreshInstalledModels()
     }
     
-    private func tryFallbackPort8005() async {
-        guard let url = URL(string: "http://127.0.0.1:8005/status") else { return }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 0.8
-        if let (data, response) = try? await URLSession.shared.data(for: request),
-           let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200,
-           let decoded = try? JSONDecoder().decode(SplashStatus.self, from: data) {
-            self.activePort = 8005
-            self.status = decoded
-            self.isRunning = decoded.ready ?? true
-            if let instanceModel = decoded.instance?.model {
-                self.activeModel = instanceModel
-            }
-            if let pid = decoded.instance?.pid {
-                self.activePid = pid
+    private func scanAndConnectPort() async {
+        let portsToTry = [activePort, lastUsedPort, 8000, 8001, 8005, 8008, 8080, 8088, 8888, 9000, 9005]
+        var seen = Set<Int>()
+        let uniquePorts = portsToTry.filter { seen.insert($0).inserted }
+        
+        for port in uniquePorts {
+            guard let url = URL(string: "http://127.0.0.1:\(port)/status") else { continue }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 0.8
+            if let (data, response) = try? await URLSession.shared.data(for: request),
+               let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200,
+               let decoded = try? JSONDecoder().decode(SplashStatus.self, from: data) {
+                self.activePort = port
+                self.lastUsedPort = port
+                self.syncShellEnvironment(port: port)
+                self.status = decoded
+                self.isRunning = decoded.ready ?? true
+                if let instanceModel = decoded.instance?.model {
+                    self.activeModel = instanceModel
+                }
+                if let pid = decoded.instance?.pid {
+                    self.activePid = pid
+                }
+                return
             }
         }
     }
@@ -699,12 +710,54 @@ public class SplashService: ObservableObject {
         self.isRunning = false
         self.status = nil
         self.activePid = nil
+        self.speedHistory.removeAll()
+        timer?.invalidate()
     }
     
     public func stopServer() {
         Task {
             await stopServerAsync()
         }
+    }
+    
+    /// Synchronous stop for applicationWillTerminate — no async, no Task
+    public func stopServerSync() {
+        // Kill splash processes via pkill (synchronous)
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        proc.arguments = ["-INT", "-f", "splash serve"]
+        try? proc.run()
+        proc.waitUntilExit()
+        
+        // Also kill on active port
+        killProcessesOnPort(port: activePort)
+        
+        // Clean lock file
+        if FileManager.default.fileExists(atPath: lockFileURL.path) {
+            try? FileManager.default.removeItem(at: lockFileURL)
+        }
+    }
+    
+    /// Reset all published state — releases memory
+    public func resetState() {
+        speedHistory.removeAll()
+        status = nil
+        isRunning = false
+        activePid = nil
+        installedModels.removeAll()
+        availableOnlineModels.removeAll()
+        lastError = nil
+        isStartingServer = false
+        startingModelId = nil
+        isInstalling = false
+        installingModelId = nil
+        installLogs.removeAll()
+        installSuccess = nil
+        isInstallingDependency = false
+        dependencyInstallLogs.removeAll()
+        dependencyInstallSuccess = nil
+        portConflict = nil
+        timer?.invalidate()
     }
     
     public func killSplashProcesses(port: Int) async {
@@ -887,86 +940,6 @@ public class SplashService: ObservableObject {
         startServer(model: selectedModelForLaunch, port: newPort)
     }
     
-    public func ensureSplashLauncherScript() {
-        try? FileManager.default.createDirectory(at: dataDirectory, withIntermediateDirectories: true)
-        let scriptURL = splashLauncherScriptURL
-        let scriptContent = """
-        #!/usr/bin/env python3
-        \"\"\"
-        Splash Bridge Launcher for Splash Monitor.
-        Enables dynamic port configuration and seamless agent connectivity.
-        \"\"\"
-        import sys
-        import os
-
-        target_port = 8000
-        new_argv = [sys.argv[0]]
-        skip_next = False
-        for i, arg in enumerate(sys.argv[1:]):
-            if skip_next:
-                skip_next = False
-                continue
-            if arg == "--port":
-                if i + 2 < len(sys.argv):
-                    try:
-                        target_port = int(sys.argv[i + 2])
-                    except ValueError:
-                        pass
-                    skip_next = True
-                continue
-            if arg.startswith("--port="):
-                try:
-                    target_port = int(arg.split("=", 1)[1])
-                except ValueError:
-                    pass
-                continue
-            new_argv.append(arg)
-
-        if "SPLASH_PORT" in os.environ:
-            try:
-                target_port = int(os.environ["SPLASH_PORT"])
-            except ValueError:
-                pass
-
-        install_dir = None
-        for candidate in [
-            "/opt/homebrew/opt/splash/libexec/install",
-            "/usr/local/opt/splash/libexec/install",
-            "/opt/homebrew/Cellar/splash/1.0/libexec/install",
-            "/usr/local/Cellar/splash/1.0/libexec/install"
-        ]:
-            if os.path.isdir(candidate):
-                install_dir = candidate
-                break
-
-        if not install_dir:
-            os.execv("/opt/homebrew/bin/splash", new_argv)
-
-        sys.path.insert(0, install_dir)
-        import launcher
-
-        launcher.PORT = target_port
-        launcher.BASE_URL = f"http://127.0.0.1:{target_port}"
-
-        orig_execve = os.execve
-        def custom_execve(path, argv, env):
-            joined = " ".join(argv)
-            if "server/server.py" in joined or "server.py" in joined:
-                if "--port" not in argv:
-                    argv.extend(["--port", str(target_port)])
-            return orig_execve(path, argv, env)
-
-        os.execve = custom_execve
-        sys.argv = new_argv
-        try:
-            sys.exit(launcher.main())
-        except SystemExit as e:
-            sys.exit(e.code)
-        """
-        try? scriptContent.write(to: scriptURL, atomically: true, encoding: .utf8)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: scriptURL.path)
-    }
-    
     public func startServer(model: String, port: Int = 8000) {
         guard isSplashInstalled else {
             installSplashDependency()
@@ -974,6 +947,7 @@ public class SplashService: ObservableObject {
         }
         
         self.activePort = port
+        self.lastUsedPort = port
         self.selectedModelForLaunch = model
         
         // 1. Pre-flight check for port conflict with third-party software
@@ -999,15 +973,8 @@ public class SplashService: ObservableObject {
             await killSplashProcesses(port: port)
             
             let splashPath = self.splashExecutablePath
-            let runCmd: String
-            if port == 8000 {
-                runCmd = "\"\(splashPath)\" serve --model \"\(model)\""
-            } else {
-                self.ensureSplashLauncherScript()
-                let pythonPath = self.splashPythonPath
-                let launcherPath = self.splashLauncherScriptURL.path
-                runCmd = "\"\(pythonPath)\" \"\(launcherPath)\" serve --model \"\(model)\" --port \"\(port)\""
-            }
+            // SIEMPRE usar --port nativo (Splash lo soporta desde v1.0)
+            let runCmd = "\"\(splashPath)\" serve --model \"\(model)\" --port \"\(port)\""
             
             let cmd = """
             echo "🌊 ==============================================="
@@ -1061,13 +1028,59 @@ public class SplashService: ObservableObject {
                 if self.isRunning { break }
             }
             
+            // Sync shell environment so terminal commands use the correct port
+            if self.isRunning {
+                if port != 8000 {
+                    self.syncShellEnvironment(port: port)
+                } else {
+                    self.clearShellEnvironment()
+                }
+            }
+            
             self.isStartingServer = false
             self.startingModelId = nil
         }
     }
     
     public func switchModel(to model: String) {
+        // Si el modelo y puerto son los mismos, solo reiniciar
+        // Si el puerto cambió, reiniciar con el nuevo puerto
         startServer(model: model, port: activePort)
+    }
+    
+    // MARK: - Shell Environment Sync
+    
+    /// Write SPLASH_PORT env vars to ~/.splash_monitor_env so terminal commands
+    /// (splash claude, splash codex, etc.) connect to the correct port.
+    public func syncShellEnvironment(port: Int) {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let envFile = home.appendingPathComponent(".splash_monitor_env")
+        let envContent = """
+        # Splash Monitor — auto-generated environment (do not edit manually)
+        # Generated by Splash Monitor for port \(port)
+        export SPLASH_PORT="\(port)"
+        export ANTHROPIC_BASE_URL="http://127.0.0.1:\(port)"
+        export OPENAI_BASE_URL="http://127.0.0.1:\(port)/v1"
+        """
+        
+        try? envContent.write(to: envFile, atomically: true, encoding: .utf8)
+        
+        // Inject source line into .zshrc if not already present
+        let zshrc = home.appendingPathComponent(".zshrc")
+        if let zshrcContent = try? String(contentsOf: zshrc, encoding: .utf8) {
+            let sourceLine = "[ -f \"\(envFile.path)\" ] && source \"\(envFile.path)\""
+            if !zshrcContent.contains("splash_monitor_env") {
+                let injection = "\n\n# Splash Monitor — port environment\n\(sourceLine)\n"
+                try? (zshrcContent + injection).write(to: zshrc, atomically: true, encoding: .utf8)
+            }
+        }
+    }
+    
+    /// Remove shell environment file when server goes back to default port
+    public func clearShellEnvironment() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let envFile = home.appendingPathComponent(".splash_monitor_env")
+        try? FileManager.default.removeItem(at: envFile)
     }
     
     // MARK: - Agent Launcher Helpers
@@ -1118,22 +1131,14 @@ public class SplashService: ObservableObject {
         
         let splashPath = splashExecutablePath
         let port = self.activePort
-        let agentRunCommand: String
-        
-        if port == 8000 {
-            agentRunCommand = "exec \"\(splashPath)\" \"\(agent)\""
-        } else {
-            ensureSplashLauncherScript()
-            let launcherPath = splashLauncherScriptURL.path
-            let pythonPath = splashPythonPath
-            agentRunCommand = """
-            export ANTHROPIC_BASE_URL="http://127.0.0.1:\(port)"
-            export OPENAI_BASE_URL="http://127.0.0.1:\(port)/v1"
-            export CUSTOM_BASE_URL="http://127.0.0.1:\(port)/v1"
-            export SPLASH_PORT="\(port)"
-            exec "\(pythonPath)" "\(launcherPath)" "\(agent)" --port "\(port)"
-            """
-        }
+        // SIEMPRE configurar env vars con el puerto activo
+        let agentRunCommand = """
+        export SPLASH_PORT="\(port)"
+        export ANTHROPIC_BASE_URL="http://127.0.0.1:\(port)"
+        export OPENAI_BASE_URL="http://127.0.0.1:\(port)/v1"
+        export CUSTOM_BASE_URL="http://127.0.0.1:\(port)/v1"
+        exec "\(splashPath)" "\(agent)"
+        """
         
         let cmd = """
         echo "🤖 ==============================================="

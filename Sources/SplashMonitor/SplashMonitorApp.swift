@@ -12,6 +12,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    func applicationWillTerminate(_ notification: Notification) {
+        // Kill splash server and release all memory
+        let service = SplashService.shared
+        service.stopServerSync()
+        service.resetState()
+    }
+    
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // If menu bar icon is active, keep app running when window is closed
         let showMenuBar = UserDefaults.standard.bool(forKey: "showMenuBarIcon")

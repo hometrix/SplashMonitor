@@ -429,6 +429,13 @@ public struct ServerControlView: View {
         .padding(10)
         .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(8)
+        .onChange(of: portString) { newValue in
+            guard let newPort = Int(newValue), newPort > 1024, newPort <= 65535 else { return }
+            // If server is running on a different port, auto-restart on new port
+            if service.isRunning && newPort != service.activePort {
+                service.startServer(model: service.activeModel, port: newPort)
+            }
+        }
     }
     
     // MARK: - 3. Coding Agents Launcher
