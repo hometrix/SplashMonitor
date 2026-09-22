@@ -66,6 +66,13 @@ public class SplashService: ObservableObject {
     @AppStorage("runInBackground") public var runInBackground: Bool = true
     @AppStorage("lastUsedPort") public var lastUsedPort: Int = 8000
     
+    // Update check
+    @Published public var hasUpdate: Bool = false
+    @Published public var latestVersion: String? = nil
+    @Published public var latestReleaseURL: String? = nil
+    public let currentVersion = "1.0.1-beta"
+    private let githubRepo = "hometrix/SplashMonitor"
+    
     // Timers & Processes
     private var timer: Timer?
     private var installProcess: Process?
@@ -177,6 +184,7 @@ public class SplashService: ObservableObject {
         refreshInstalledModels()
         Task {
             await fetchOnlineModels()
+            await checkForUpdate()
         }
     }
     
@@ -580,6 +588,29 @@ public class SplashService: ObservableObject {
     }
     
     // MARK: - Online Models Catalog (Hugging Face)
+    
+    public func checkForUpdate() async {
+        guard let url = URL(string: "https://api.github.com/repos/\(githubRepo)/releases/latest") else { return }
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 5.0
+        
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tagName = json["tag_name"] as? String else { return }
+        
+        // Extract version number: "v1.0.2-beta" → "1.0.2-beta"
+        let latest = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
+        
+        // Simple version comparison (lexicographic works for semver-like strings)
+        if latest > currentVersion {
+            self.hasUpdate = true
+            self.latestVersion = tagName
+            self.latestReleaseURL = json["html_url"] as? String ?? "https://github.com/\(githubRepo)/releases/latest"
+        } else {
+            self.hasUpdate = false
+        }
+    }
     
     public func fetchOnlineModels() async {
         self.isLoadingOnlineModels = true

@@ -3,6 +3,7 @@ import AppKit
 
 public struct AboutView: View {
     @ObservedObject var loc = Localization.shared
+    @ObservedObject var service = SplashService.shared
     
     public init() {}
     
@@ -16,7 +17,7 @@ public struct AboutView: View {
                     .font(.system(size: 24, weight: .bold, design: .rounded))
                 
                 HStack(spacing: 6) {
-                    Text("v1.0.0")
+                    Text("v\(service.currentVersion)")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
                         .foregroundColor(.secondary)
                     

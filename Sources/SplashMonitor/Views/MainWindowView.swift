@@ -168,6 +168,11 @@ public struct MainWindowView: View {
                         .padding(16)
                 }
                 
+                // Update available banner
+                if service.hasUpdate {
+                    updateBanner
+                }
+                
                 // First-launch or pending prompt to place icon in top menu bar
                 if !hasAskedAboutMenuBar {
                     menuBarPromptBanner
@@ -198,6 +203,51 @@ public struct MainWindowView: View {
                 selectedSidebarItem = .about
             }
         }
+    }
+    
+    // MARK: - Update Available Banner
+    private var updateBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 22))
+                .foregroundColor(.green)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(loc.isSpanish ? "Nueva versión disponible" : "Update available")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(loc.isSpanish 
+                    ? "Splash Monitor \(service.latestVersion ?? "nueva versión") está disponible para descargar."
+                    : "Splash Monitor \(service.latestVersion ?? "new version") is available for download.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Button(loc.isSpanish ? "Descargar" : "Download") {
+                if let url = URL(string: service.latestReleaseURL ?? "https://github.com/hometrix/SplashMonitor/releases/latest") {
+                    NSWorkspace.shared.open(url)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .controlSize(.small)
+            
+            Button(loc.isSpanish ? "Omitir" : "Skip") {
+                service.hasUpdate = false
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.green.opacity(0.12))
+        .overlay(
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(Color.green.opacity(0.2)),
+            alignment: .bottom
+        )
     }
     
     // MARK: - Menu Bar Prompt Banner
@@ -344,6 +394,52 @@ public struct MainWindowView: View {
                     Text(String(format: "%.1f s", service.refreshInterval))
                         .font(.system(size: 12, design: .monospaced))
                         .frame(width: 50)
+                }
+            }
+            .padding(14)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(10)
+            
+            // Check for updates
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(loc.isSpanish ? "Actualizaciones de Splash Monitor" : "Splash Monitor Updates")
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer()
+                    if service.hasUpdate {
+                        Text(loc.isSpanish ? "¡Nueva versión: \(service.latestVersion ?? "")!" : "New version: \(service.latestVersion ?? "")!")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.green)
+                    } else {
+                        Text(loc.isSpanish ? "Estás en la última versión" : "You're up to date")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                HStack(spacing: 8) {
+                    Button {
+                        Task { await service.checkForUpdate() }
+                    } label: {
+                        Label(loc.isSpanish ? "Buscar actualizaciones" : "Check for updates", systemImage: "arrow.clockwise")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    
+                    if service.hasUpdate, let url = service.latestReleaseURL {
+                        Button {
+                            if let releaseURL = URL(string: url) {
+                                NSWorkspace.shared.open(releaseURL)
+                            }
+                        } label: {
+                            Label(loc.isSpanish ? "Descargar nueva versión" : "Download new version", systemImage: "arrow.down.circle")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.green)
+                        .controlSize(.small)
+                    }
                 }
             }
             .padding(14)

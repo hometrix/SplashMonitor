@@ -27,6 +27,10 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Liberación de memoria al detener servidor:** `stopServerAsync()` ahora limpia `speedHistory` y detiene el timer de polling, reduciendo la presión de memoria del sistema inmediatamente.
 - **`resetState()` público:** Nuevo método que resetea TODO el estado publicado de `SplashService`, disponible para uso en `applicationWillTerminate` y futuras optimizaciones.
 
+### 🚀 Novedades
+
+- **Detección Automática de Actualizaciones:** La app consulta GitHub Releases al iniciar y muestra un banner verde cuando hay una nueva versión disponible. Botón "Buscar actualizaciones" en Configuración con enlace directo a la descarga.
+
 ## [1.0.0-beta] - 2026-09-20
 
 ### 🚀 Novedades y Características
