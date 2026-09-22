@@ -9,7 +9,8 @@ y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### 🐛 Correcciones
 
-- **Puerto persistente entre sesiones:** El puerto seleccionado ahora se guarda en `@AppStorage` y se restaura al reiniciar la app o después de un upgrade de Splash. Antes, al ejecutar `brew upgrade splash`, la app perdía el puerto y quedaba desconectada.
+- **Crash por bloqueo del main thread en detección de agentes:** `isAgentInstalled()` ejecutaba `Process.waitUntilExit()` desde el body de SwiftUI, bloqueando el main thread durante el layout y causando `EXC_BAD_ACCESS (SIGSEGV)`. Se reemplazó por detección asíncrona con cache en `installedAgents: Set<String>`, verificada solo vía filesystem sin usar Process.
+- **Puerto persistente entre sesiones:** El puerto seleccionado ahora se guarda y se restaura al reiniciar la app o después de un upgrade de Splash. Antes, al ejecutar `brew upgrade splash`, la app perdía el puerto y quedaba desconectada.
 - **Propagación de puerto al motor:** `startServer()` ahora SIEMPRE pasa `--port` al comando `splash serve`, eliminando el comportamiento inconsistente donde el puerto 8000 se ejecutaba sin la flag y puertos personalizados usaban un bridge launcher innecesario.
 - **Reinicio automático al cambiar puerto:** Cuando el usuario escribe un nuevo puerto en el campo de texto y el servidor está corriendo, la app reinicia automáticamente el servidor en el nuevo puerto. No es necesario presionar "Reiniciar" manualmente.
 - **Agentes conectan al puerto correcto:** `launchAgent()` ahora SIEMPRE configura `SPLASH_PORT`, `ANTHROPIC_BASE_URL` y `OPENAI_BASE_URL` con el puerto activo, eliminando el error "No ready Splash server" cuando el servidor corre en un puerto diferente al default.

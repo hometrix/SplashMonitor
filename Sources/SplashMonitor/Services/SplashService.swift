@@ -73,6 +73,9 @@ public class SplashService: ObservableObject {
     public let currentVersion = "1.0.1-beta"
     private let githubRepo = "hometrix/SplashMonitor"
     
+    // Agent installation cache (checked async, not on main thread)
+    @Published public var installedAgents: Set<String> = []
+    
     // Timers & Processes
     private var timer: Timer?
     private var installProcess: Process?
@@ -185,6 +188,7 @@ public class SplashService: ObservableObject {
         Task {
             await fetchOnlineModels()
             await checkForUpdate()
+            refreshAgentAvailability()
         }
     }
     
@@ -777,6 +781,7 @@ public class SplashService: ObservableObject {
         activePid = nil
         installedModels.removeAll()
         availableOnlineModels.removeAll()
+        installedAgents.removeAll()
         lastError = nil
         isStartingServer = false
         startingModelId = nil
@@ -1116,27 +1121,36 @@ public class SplashService: ObservableObject {
     
     // MARK: - Agent Launcher Helpers
     
+    /// Fast check using filesystem only — no Process, no blocking
     public func isAgentInstalled(agent: String) -> Bool {
+        return installedAgents.contains(agent)
+    }
+    
+    /// Background check — safe to call from any thread
+    public func refreshAgentAvailability() {
+        let agents = ["claude", "opencode", "codex", "hermes"]
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let candidates = [
-            "/opt/homebrew/bin/\(agent)",
-            "/usr/local/bin/\(agent)",
-            "/usr/bin/\(agent)",
-            "\(home)/.npm-global/bin/\(agent)",
-            "\(home)/.cargo/bin/\(agent)",
-            "\(home)/.local/bin/\(agent)"
-        ]
-        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
-            return true
+        
+        Task.detached(priority: .utility) {
+            var found = Set<String>()
+            for agent in agents {
+                let candidates = [
+                    "/opt/homebrew/bin/\(agent)",
+                    "/usr/local/bin/\(agent)",
+                    "/usr/bin/\(agent)",
+                    "\(home)/.npm-global/bin/\(agent)",
+                    "\(home)/.cargo/bin/\(agent)",
+                    "\(home)/.local/bin/\(agent)"
+                ]
+                if candidates.contains(where: { FileManager.default.isExecutableFile(atPath: $0) }) {
+                    found.insert(agent)
+                }
+            }
+            let result = found
+            await MainActor.run {
+                self.installedAgents = result
+            }
         }
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        proc.arguments = [agent]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        try? proc.run()
-        proc.waitUntilExit()
-        return proc.terminationStatus == 0
     }
     
     public func agentInstallURL(agent: String) -> URL {
