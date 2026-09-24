@@ -70,7 +70,7 @@ public class SplashService: ObservableObject {
     @Published public var hasUpdate: Bool = false
     @Published public var latestVersion: String? = nil
     @Published public var latestReleaseURL: String? = nil
-    public let currentVersion = "1.0.1-beta"
+    public let currentVersion = "1.0.2-beta"
     private let githubRepo = "hometrix/SplashMonitor"
     
     // Agent installation cache (checked async, not on main thread)

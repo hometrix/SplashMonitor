@@ -5,6 +5,26 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.2-beta] - 2026-09-24
+
+### 🚀 Novedades y Características
+
+- **Panel de Apps Conectadas (`ConnectedAppsView`):** Nuevo apartado en el menú lateral para monitorear en tiempo real todas las aplicaciones, editores, agentes autónomos y procesos locales de macOS que están consumiendo el motor de inferencia Splash en el puerto activo (`127.0.0.1:puerto`).
+- **Detección Automática de Conexiones TCP:** Inspección en segundo plano de sockets TCP activos (`lsof -iTCP:<puerto> -sTCP:ESTABLISHED`) con resolución automática de metadatos de apps mediante `NSRunningApplication` (nombre oficial, bundle identifier e ícono de alta resolución de macOS).
+- **Identificación Inteligente de Categorías:** Clasificación visual automática de clientes en:
+  - 🟣 **IDEs / Editores:** Cursor, Visual Studio Code, Xcode, Zed, JetBrains, etc.
+  - 🟠 **Agentes Autónomos:** Claude Code, OpenCode, Codex, Hermes, Aider.
+  - 🟢 **Chatbots y WebUIs:** Chatbox, NextChat, OpenWebUI, LM Studio, Ollama apps.
+  - 🔵 **Terminales:** Terminal macOS, iTerm2, Warp, Kitty, Alacritty.
+  - 🔷 **Scripts y Automatizaciones:** Python (OpenAI SDK / LangChain), Node.js, cURL.
+- **Acciones Rápidas por Aplicación:**
+  - 🚀 Traer la aplicación cliente directamente al frente (`activateApp`).
+  - 📂 Mostrar el paquete o binario en el Finder de macOS (`revealAppInFinder`).
+  - 🛑 Terminar el proceso cliente (`terminateApp`).
+- **Hub de Integración y Guía Rápida (Quick Connect):** Pestaña interactiva con guías paso a paso y botones para copiar con 1-clic las configuraciones de API y variables de entorno para Cursor, VS Code (Continue/Cline), Claude Code CLI, Chatbox, scripts de Python y cURL.
+- **Insignia Reactiva en el Menú Lateral:** Conteo en tiempo real de aplicaciones activas en la barra de navegación lateral de la aplicación principal.
+- **Barra de Apps Conectadas en el Dashboard:** Mini-resumen horizontal integrado en el Dashboard de Tokens (`TokenMetricsView`) con los íconos de las apps que están generando peticiones en la sesión actual.
+
 ## [1.0.1-beta] - 2026-09-22
 
 ### 🐛 Correcciones
