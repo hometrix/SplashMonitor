@@ -6,7 +6,7 @@ cd "$DIR"
 
 APP_NAME="Splash Monitor"
 APP_DIR="$DIR/$APP_NAME.app"
-VERSION="1.0.0-beta"
+VERSION="1.0.2-beta"
 DMG_NAME="SplashMonitor-${VERSION}.dmg"
 DMG_OUTPUT="$DIR/$DMG_NAME"
 TEMP_DMG_DIR="$DIR/.dmg_temp"
