@@ -5,8 +5,8 @@ set -e
 # Developed by JMGREP Developers (Joan Gregorio Pérez)
 
 REPO="hometrix/SplashMonitor"
-TAG="v1.0.0-beta"
-DMG_URL="https://github.com/${REPO}/releases/download/${TAG}/SplashMonitor-1.0.0-beta.dmg"
+TAG="v1.0.2-beta"
+DMG_URL="https://github.com/${REPO}/releases/download/${TAG}/SplashMonitor-${TAG#v}.dmg"
 TEMP_DMG="/tmp/SplashMonitor-installer.dmg"
 MOUNT_DIR="/tmp/SplashMonitor-mount"
 
