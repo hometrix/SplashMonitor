@@ -76,6 +76,10 @@ public class SplashService: ObservableObject {
     // Agent installation cache (checked async, not on main thread)
     @Published public var installedAgents: Set<String> = []
     
+    // Connected Applications & Clients
+    @Published public var connectedApps: [ConnectedApp] = []
+    private var knownClientsSession: [Int32: ConnectedApp] = [:]
+    
     // Timers & Processes
     private var timer: Timer?
     private var installProcess: Process?
@@ -468,6 +472,9 @@ public class SplashService: ObservableObject {
             }
         }
         
+        // Scan active connected apps/clients
+        await scanConnectedClients()
+        
         // Update active flag on installed models list
         refreshInstalledModels()
     }
@@ -782,6 +789,8 @@ public class SplashService: ObservableObject {
         installedModels.removeAll()
         availableOnlineModels.removeAll()
         installedAgents.removeAll()
+        connectedApps.removeAll()
+        knownClientsSession.removeAll()
         lastError = nil
         isStartingServer = false
         startingModelId = nil
@@ -1263,5 +1272,162 @@ public class SplashService: ObservableObject {
             return String(format: "%.1fK", Double(num) / 1_000.0)
         }
         return "\(num)"
+    }
+    
+    // MARK: - Connected Apps / Client Detection
+    
+    public func scanConnectedClients() async {
+        guard isRunning else {
+            if !connectedApps.isEmpty {
+                self.connectedApps = []
+                self.knownClientsSession.removeAll()
+            }
+            return
+        }
+        
+        let port = self.activePort
+        let serverPid = self.activePid
+        
+        let detected = await Task.detached(priority: .utility) { () -> [ConnectedApp] in
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+            proc.arguments = ["-iTCP:\(port)", "-sTCP:ESTABLISHED", "-n", "-P"]
+            let pipe = Pipe()
+            proc.standardOutput = pipe
+            
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+            } catch {
+                return []
+            }
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            
+            var pidConnections: [Int32: (name: String, count: Int, remote: String)] = [:]
+            let lines = output.components(separatedBy: .newlines)
+            
+            for line in lines {
+                let parts = line.split(separator: " ", omittingEmptySubsequences: true)
+                guard parts.count >= 9 else { continue }
+                guard let pid = Int32(parts[1]), pid > 0 else { continue }
+                
+                // Skip server process itself
+                if let sPid = serverPid, Int32(sPid) == pid { continue }
+                
+                let comm = String(parts[0])
+                let namePart = String(parts[8])
+                
+                // Filter out Splash's internal engine or python if under a different PID
+                if comm.localizedCaseInsensitiveContains("splash") && !comm.localizedCaseInsensitiveContains("claude") {
+                    continue
+                }
+                
+                if let existing = pidConnections[pid] {
+                    pidConnections[pid] = (name: existing.name, count: existing.count + 1, remote: existing.remote)
+                } else {
+                    pidConnections[pid] = (name: comm, count: 1, remote: namePart)
+                }
+            }
+            
+            var apps: [ConnectedApp] = []
+            
+            for (pid, info) in pidConnections {
+                let runningApp = NSRunningApplication(processIdentifier: pid)
+                let appName = runningApp?.localizedName ?? info.name
+                let bundleId = runningApp?.bundleIdentifier
+                let icon = runningApp?.icon
+                let execPath = runningApp?.executableURL?.path
+                
+                let lowerName = appName.lowercased()
+                let lowerComm = info.name.lowercased()
+                let category: AppCategory
+                
+                if lowerName.contains("cursor") || lowerName.contains("code") || lowerName.contains("xcode") || lowerName.contains("zed") || lowerName.contains("studio") || lowerName.contains("intellij") || lowerName.contains("pycharm") {
+                    category = .ide
+                } else if lowerComm.contains("claude") || lowerComm.contains("opencode") || lowerComm.contains("hermes") || lowerComm.contains("codex") || lowerComm.contains("aider") {
+                    category = .codingAgent
+                } else if lowerName.contains("chat") || lowerName.contains("webui") || lowerName.contains("lmstudio") || lowerName.contains("ollama") || lowerName.contains("nextchat") {
+                    category = .chatbot
+                } else if lowerName.contains("terminal") || lowerName.contains("iterm") || lowerName.contains("warp") || lowerName.contains("kitty") || lowerName.contains("alacritty") {
+                    category = .terminal
+                } else {
+                    category = .customScript
+                }
+                
+                let app = ConnectedApp(
+                    pid: pid,
+                    name: appName,
+                    bundleId: bundleId,
+                    executablePath: execPath,
+                    category: category,
+                    icon: icon,
+                    connectionCount: info.count,
+                    status: .active,
+                    firstConnected: Date(),
+                    lastSeen: Date(),
+                    remoteAddress: info.remote
+                )
+                apps.append(app)
+            }
+            
+            return apps
+        }.value
+        
+        let now = Date()
+        var updatedList: [ConnectedApp] = []
+        var activePids = Set<Int32>()
+        
+        for var detectedApp in detected {
+            activePids.insert(detectedApp.pid)
+            if let existing = knownClientsSession[detectedApp.pid] {
+                detectedApp.firstConnected = existing.firstConnected
+            }
+            detectedApp.lastSeen = now
+            detectedApp.status = .active
+            knownClientsSession[detectedApp.pid] = detectedApp
+            updatedList.append(detectedApp)
+        }
+        
+        for (pid, var cachedApp) in knownClientsSession {
+            if !activePids.contains(pid) {
+                let elapsed = now.timeIntervalSince(cachedApp.lastSeen)
+                if elapsed < 60.0 {
+                    cachedApp.status = .recent
+                    cachedApp.connectionCount = 0
+                    updatedList.append(cachedApp)
+                } else {
+                    knownClientsSession.removeValue(forKey: pid)
+                }
+            }
+        }
+        
+        self.connectedApps = updatedList.sorted { 
+            if $0.status == .active && $1.status != .active { return true }
+            if $0.status != .active && $1.status == .active { return false }
+            return $0.lastSeen > $1.lastSeen
+        }
+    }
+    
+    public func activateApp(app: ConnectedApp) {
+        if let running = NSRunningApplication(processIdentifier: app.pid) {
+            running.activate(options: .activateIgnoringOtherApps)
+        }
+    }
+    
+    public func revealAppInFinder(app: ConnectedApp) {
+        if let path = app.executablePath, FileManager.default.fileExists(atPath: path) {
+            NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: "")
+        } else if let bundle = app.bundleId,
+                  let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) {
+            NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+        }
+    }
+    
+    public func terminateApp(app: ConnectedApp) {
+        kill(app.pid, SIGTERM)
+        knownClientsSession.removeValue(forKey: app.pid)
+        self.connectedApps.removeAll(where: { $0.pid == app.pid })
     }
 }

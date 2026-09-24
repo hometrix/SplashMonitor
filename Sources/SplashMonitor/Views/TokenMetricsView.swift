@@ -146,6 +146,58 @@ public struct TokenMetricsView: View {
             .background(Color(nsColor: .quaternaryLabelColor).opacity(0.2))
             .cornerRadius(8)
             
+            // Connected Applications Quick Bar
+            if service.isRunning {
+                HStack(spacing: 8) {
+                    Image(systemName: "app.connected.to.app.below.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.purple)
+                    
+                    let activeApps = service.connectedApps.filter { $0.status == .active || $0.status == .idle }
+                    if activeApps.isEmpty {
+                        Text(tr(es: "Apps conectadas:", en: "Connected apps:"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        Text(tr(es: "Ninguna activa (escuchando :\(service.activePort))", en: "None active (listening :\(service.activePort))"))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text(tr(es: "Apps conectadas (\(activeApps.count)):", en: "Connected apps (\(activeApps.count)):"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(activeApps) { app in
+                                    HStack(spacing: 4) {
+                                        if let icon = app.icon {
+                                            Image(nsImage: icon)
+                                                .resizable()
+                                                .frame(width: 14, height: 14)
+                                        } else {
+                                            Image(systemName: app.category.iconName)
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.purple)
+                                        }
+                                        Text(app.name)
+                                            .font(.system(size: 10, weight: .medium))
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color(nsColor: .controlBackgroundColor))
+                                    .cornerRadius(5)
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(8)
+                .background(Color.purple.opacity(0.08))
+                .cornerRadius(6)
+            }
+            
             // Requests Overview
             let reqs = service.status?.requests
             HStack(spacing: 14) {

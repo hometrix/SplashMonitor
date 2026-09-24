@@ -10,6 +10,7 @@ public struct MainWindowView: View {
     
     public enum SidebarItem: String, CaseIterable, Identifiable {
         case dashboard
+        case connectedApps
         case models
         case server
         case settings
@@ -20,6 +21,7 @@ public struct MainWindowView: View {
         public func title(isSpanish: Bool) -> String {
             switch self {
             case .dashboard: return isSpanish ? "Dashboard de Tokens" : "Token Dashboard"
+            case .connectedApps: return isSpanish ? "Apps Conectadas" : "Connected Apps"
             case .models: return isSpanish ? "Gestor de Modelos" : "Model Manager"
             case .server: return isSpanish ? "Servidor y Agentes" : "Server & Agents"
             case .settings: return isSpanish ? "Configuración" : "Settings"
@@ -30,6 +32,7 @@ public struct MainWindowView: View {
         public var icon: String {
             switch self {
             case .dashboard: return "speedometer"
+            case .connectedApps: return "app.connected.to.app.below.fill"
             case .models: return "shippingbox"
             case .server: return "server.rack"
             case .settings: return "gearshape"
@@ -98,6 +101,19 @@ public struct MainWindowView: View {
                                     .foregroundColor(selectedSidebarItem == item ? .primary : .secondary)
                                 
                                 Spacer()
+                                
+                                if item == .connectedApps {
+                                    let count = service.connectedApps.filter { $0.status == .active }.count
+                                    if count > 0 {
+                                        Text("\(count)")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 1)
+                                            .background(Color.green)
+                                            .clipShape(Capsule())
+                                    }
+                                }
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
@@ -184,6 +200,8 @@ public struct MainWindowView: View {
                         switch selectedSidebarItem {
                         case .dashboard:
                             dashboardDetailView
+                        case .connectedApps:
+                            ConnectedAppsView(service: service)
                         case .models:
                             ModelManagerView(service: service)
                         case .server:
