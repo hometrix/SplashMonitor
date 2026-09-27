@@ -76,6 +76,27 @@ public class SplashService: ObservableObject {
     // Agent installation cache (checked async, not on main thread)
     @Published public var installedAgents: Set<String> = []
     
+    // MARK: - Hugging Face Token (Keychain-backed)
+    
+    /// True when a token exists in the Keychain. The token value itself is never published.
+    @Published public var hasHFToken: Bool = false
+    /// Masked preview of the stored token (`hf_••••cdef`) for the Settings UI.
+    @Published public var hfTokenPreview: String? = nil
+    /// Keychain failure surfaced to the UI (never contains the token).
+    @Published public var hfTokenError: String? = nil
+    /// Result of the last "Test token" round-trip to `whoami-v2`.
+    @Published public var hfTokenTestResult: HFTokenTestResult? = nil
+    @Published public var isTestingHFToken: Bool = false
+    /// True when `hf_transfer` is importable in the engine's Python environment.
+    @Published public var isHFTransferAvailable: Bool = false
+    @Published public var isCheckingHFTransfer: Bool = false
+    
+    /// In-memory copy of the token; the Keychain remains the source of truth.
+    private var hfTokenCache: String?
+    /// Set while a download gets a 401/403/gated response, so the failure message can
+    /// point at the Settings token field.
+    private var installSawAuthFailure = false
+    
     // Connected Applications & Clients
     @Published public var connectedApps: [ConnectedApp] = []
     private var knownClientsSession: [Int32: ConnectedApp] = [:]
@@ -186,6 +207,7 @@ public class SplashService: ObservableObject {
     
     public init() {
         self.activePort = lastUsedPort
+        refreshHFTokenState()
         checkDependencies()
         startPolling()
         refreshInstalledModels()
@@ -193,6 +215,7 @@ public class SplashService: ObservableObject {
             await fetchOnlineModels()
             await checkForUpdate()
             refreshAgentAvailability()
+            refreshHFTransferAvailability()
         }
     }
     
@@ -626,10 +649,12 @@ public class SplashService: ObservableObject {
     public func fetchOnlineModels() async {
         self.isLoadingOnlineModels = true
         var allItems: [String: HuggingFaceModelItem] = [:]
+        // A token makes gated/private repos show up in the catalog as well.
+        let token = currentHFToken()
         
         // 1. Fetch Inco AI models
         if let incoUrl = URL(string: "https://huggingface.co/api/models?author=incoai") {
-            if let (data, _) = try? await URLSession.shared.data(from: incoUrl),
+            if let (data, _) = try? await URLSession.shared.data(for: Self.hfRequest(url: incoUrl, token: token)),
                let items = try? JSONDecoder().decode([HuggingFaceModelItem].self, from: data) {
                 for item in items {
                     if item.id.hasSuffix("-Splash") || (item.tags?.contains("splash") ?? false) {
@@ -641,7 +666,7 @@ public class SplashService: ObservableObject {
         
         // 2. Fetch all models with tag "splash"
         if let splashTagUrl = URL(string: "https://huggingface.co/api/models?filter=splash") {
-            if let (data, _) = try? await URLSession.shared.data(from: splashTagUrl),
+            if let (data, _) = try? await URLSession.shared.data(for: Self.hfRequest(url: splashTagUrl, token: token)),
                let items = try? JSONDecoder().decode([HuggingFaceModelItem].self, from: data) {
                 for item in items {
                     allItems[item.id] = item
@@ -661,6 +686,128 @@ public class SplashService: ObservableObject {
         self.isLoadingOnlineModels = false
     }
     
+    /// GET request for the Hugging Face API, authenticated when a token is stored.
+    private static func hfRequest(url: URL, token: String?) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        if let token, !token.isEmpty {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        return request
+    }
+    
+    // MARK: - Hugging Face Token Management
+    
+    /// Reload the Keychain state into the published properties (no token value published).
+    public func refreshHFTokenState() {
+        let token = HFTokenStore.load()
+        hfTokenCache = token
+        hasHFToken = token != nil
+        hfTokenPreview = token.map { HFTokenStore.masked($0) }
+        if token == nil {
+            hfTokenTestResult = nil
+        }
+    }
+    
+    /// Token to inject into downloads and API calls (memory cache, then Keychain).
+    public func currentHFToken() -> String? {
+        if let hfTokenCache { return hfTokenCache }
+        let token = HFTokenStore.load()
+        hfTokenCache = token
+        hasHFToken = token != nil
+        hfTokenPreview = token.map { HFTokenStore.masked($0) }
+        return token
+    }
+    
+    /// Store the token in the Keychain, or remove it when the value is blank.
+    /// Returns false (with `hfTokenError` set) when the Keychain rejects the write.
+    @discardableResult
+    public func setHFToken(_ raw: String?) -> Bool {
+        let trimmed = (raw ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if trimmed.isEmpty {
+            HFTokenStore.delete()
+            hfTokenCache = nil
+            hasHFToken = false
+            hfTokenPreview = nil
+            hfTokenTestResult = nil
+            hfTokenError = nil
+            // Rewrite the shell env without the exports: the secret must not linger there.
+            syncShellEnvironment(port: activePort)
+            return true
+        }
+        
+        let status = HFTokenStore.save(trimmed)
+        guard status == errSecSuccess else {
+            hfTokenError = "Keychain error \(status)"
+            return false
+        }
+        hfTokenCache = trimmed
+        hasHFToken = true
+        hfTokenPreview = HFTokenStore.masked(trimmed)
+        hfTokenTestResult = nil
+        hfTokenError = nil
+        // Terminal `splash` commands get the same authenticated, fast downloads.
+        syncShellEnvironment(port: activePort)
+        return true
+    }
+    
+    /// Validate the stored token against `https://huggingface.co/api/whoami-v2`.
+    public func testHFToken() async {
+        guard !isTestingHFToken else { return }
+        guard let token = currentHFToken() else {
+            hfTokenTestResult = .noToken
+            return
+        }
+        isTestingHFToken = true
+        hfTokenTestResult = nil
+        
+        var request = URLRequest(url: HuggingFaceSupport.whoamiURL)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 12
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 200 {
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let name = (json?["name"] as? String)
+                    ?? (json?["fullname"] as? String)
+                    ?? (json?["preferred_username"] as? String)
+                hfTokenTestResult = .success(user: name ?? "Hugging Face")
+            } else if status == 401 || status == 403 {
+                hfTokenTestResult = .invalidToken(statusCode: status)
+            } else {
+                hfTokenTestResult = .networkError("HTTP \(status)")
+            }
+        } catch {
+            hfTokenTestResult = .networkError(error.localizedDescription)
+        }
+        isTestingHFToken = false
+    }
+    
+    /// Detect whether the engine's Python environment can `import hf_transfer`.
+    /// Downloads silently fall back to the standard backend when it is missing.
+    public func refreshHFTransferAvailability() {
+        let pythonPath = splashPythonPath
+        guard !pythonPath.isEmpty else {
+            isHFTransferAvailable = false
+            return
+        }
+        isCheckingHFTransfer = true
+        Task.detached(priority: .utility) {
+            let available = HuggingFaceSupport.isHFTransferInstalled(pythonPath: pythonPath)
+            await MainActor.run {
+                self.isHFTransferAvailable = available
+                self.isCheckingHFTransfer = false
+                // Keep the exported env file honest (HF_HUB_ENABLE_HF_TRANSFER)
+                if self.hasHFToken {
+                    self.syncShellEnvironment(port: self.activePort)
+                }
+            }
+        }
+    }
+    
     // MARK: - Model Installation
     
     public func installModel(repoId: String) {
@@ -669,10 +816,13 @@ public class SplashService: ObservableObject {
         installingModelId = repoId
         installLogs = ["Iniciando descarga y preparación para \(repoId)..."]
         installSuccess = nil
+        installSawAuthFailure = false
         
         let modelsPath = modelsDirectory.path
         let scriptPath = splashModelsScriptPath
         let pythonPath = splashPythonPath
+        // Token is read once, here, and lives only in memory afterwards.
+        let hfToken = currentHFToken()
         
         Task.detached(priority: .userInitiated) {
             guard !scriptPath.isEmpty, FileManager.default.fileExists(atPath: scriptPath) else {
@@ -685,9 +835,50 @@ public class SplashService: ObservableObject {
                 return
             }
             
+            // Fast Rust downloader only when the package is really importable; enabling
+            // the flag without it makes huggingface_hub fail.
+            let transfersAvailable = HuggingFaceSupport.isHFTransferInstalled(pythonPath: pythonPath)
+            // The environment is built explicitly: `Process` would otherwise inherit the
+            // app's launchd environment, which carries neither the token nor a usable PATH.
+            let downloaderEnvironment = HuggingFaceSupport.downloaderEnvironment(
+                token: hfToken,
+                transfersEnabled: transfersAvailable
+            )
+            
+            await MainActor.run {
+                self.isHFTransferAvailable = transfersAvailable
+                if let hfToken {
+                    self.installLogs.append(tr(
+                        es: "🔑 Token de Hugging Face detectado (\(HFTokenStore.masked(hfToken))): descarga autenticada.",
+                        en: "🔑 Hugging Face token detected (\(HFTokenStore.masked(hfToken))): authenticated download."
+                    ))
+                } else {
+                    self.installLogs.append(tr(
+                        es: "⚠️ Sin token de Hugging Face: descarga anónima (más lenta, con límite de tasa y sin acceso a repos gated).",
+                        en: "⚠️ No Hugging Face token: anonymous download (slower, rate-limited and no access to gated repos)."
+                    ))
+                    self.installLogs.append(tr(
+                        es: "   Añade uno en Configuración → Hugging Face.",
+                        en: "   Add one in Settings → Hugging Face."
+                    ))
+                }
+                if transfersAvailable {
+                    self.installLogs.append(tr(
+                        es: "🚀 Descargador rápido activado (hf_transfer).",
+                        en: "🚀 Fast downloader enabled (hf_transfer)."
+                    ))
+                } else {
+                    self.installLogs.append(tr(
+                        es: "ℹ️ hf_transfer no está instalado en el entorno del motor: se usa el descargador estándar.",
+                        en: "ℹ️ hf_transfer is not installed in the engine environment: using the standard downloader."
+                    ))
+                }
+            }
+            
             let process = Process()
             process.executableURL = URL(fileURLWithPath: pythonPath)
             process.arguments = ["-u", scriptPath, "--models", modelsPath, "--model", repoId, "prepare"]
+            process.environment = downloaderEnvironment
             
             let pipe = Pipe()
             process.standardOutput = pipe
@@ -700,7 +891,12 @@ public class SplashService: ObservableObject {
                 let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
                 Task { @MainActor in
                     for line in lines {
-                        self.installLogs.append(line)
+                        // Belt and braces: the token must never reach the visible log.
+                        let safeLine = HuggingFaceSupport.redact(line, token: hfToken)
+                        if HuggingFaceSupport.indicatesAuthFailure(safeLine) {
+                            self.installSawAuthFailure = true
+                        }
+                        self.installLogs.append(safeLine)
                     }
                 }
             }
@@ -709,24 +905,75 @@ public class SplashService: ObservableObject {
                 self.installProcess = process
             }
             
+            // Estimate real throughput from the growth of the repo's Hugging Face cache
+            // directory: backend-agnostic, unlike parsing progress bars.
+            var sampler: HFDownloadSpeedSampler? = nil
+            if let cacheDirectory = HuggingFaceSupport.hubCacheDirectory(forRepo: repoId) {
+                sampler = HFDownloadSpeedSampler(directory: cacheDirectory)
+                sampler?.start { sample in
+                    Task { @MainActor in
+                        // Nothing downloaded yet (or the cache lives elsewhere): stay quiet
+                        // rather than printing a meaningless 0 B/s.
+                        guard self.isInstalling, sample.downloadedBytes > 0 else { return }
+                        let speed = HuggingFaceSupport.formattedSpeed(sample.bytesPerSecond)
+                        let bytes = HuggingFaceSupport.formattedBytes(sample.downloadedBytes)
+                        let text = tr(
+                            es: "⏱️ \(speed) · \(bytes) descargados",
+                            en: "⏱️ \(speed) · \(bytes) downloaded"
+                        )
+                        // Replace the live line in place instead of flooding the console.
+                        if let last = self.installLogs.indices.last, self.installLogs[last].hasPrefix("⏱️ ") {
+                            self.installLogs[last] = text
+                        } else {
+                            self.installLogs.append(text)
+                        }
+                    }
+                }
+            }
+            
             do {
                 try process.run()
                 process.waitUntilExit()
                 outHandle.readabilityHandler = nil
+                let summary = sampler?.stop()
                 
                 let success = process.terminationStatus == 0
                 await MainActor.run {
                     self.installProcess = nil
                     self.isInstalling = false
                     self.installSuccess = success
+                    if let summary, summary.downloadedBytes > 0 {
+                        let bytes = HuggingFaceSupport.formattedBytes(summary.downloadedBytes)
+                        let seconds = String(format: "%.0f", summary.elapsed)
+                        let average = HuggingFaceSupport.formattedSpeed(summary.averageBytesPerSecond)
+                        let peak = HuggingFaceSupport.formattedSpeed(summary.peakBytesPerSecond)
+                        self.installLogs.append(tr(
+                            es: "📈 Descarga medida: \(bytes) en \(seconds) s — media \(average), pico \(peak).",
+                            en: "📈 Measured download: \(bytes) in \(seconds) s — average \(average), peak \(peak)."
+                        ))
+                    }
                     if success {
                         self.installLogs.append(" Instalación y verificación de \(repoId) completada con éxito.")
                         self.refreshInstalledModels()
                     } else {
                         self.installLogs.append(" Error al instalar \(repoId). Código de salida: \(process.terminationStatus)")
+                        if self.installSawAuthFailure {
+                            if self.hasHFToken {
+                                self.installLogs.append(tr(
+                                    es: "🔒 Hugging Face rechazó la petición (401/403): el token no tiene acceso a este repositorio o falta aceptar la licencia del modelo en su página.",
+                                    en: "🔒 Hugging Face rejected the request (401/403): the token has no access to this repository, or the model license has not been accepted on its page."
+                                ))
+                            } else {
+                                self.installLogs.append(tr(
+                                    es: "🔒 Este modelo es gated o requiere autenticación: añade un token de Hugging Face en Configuración → Hugging Face.",
+                                    en: "🔒 This model is gated or requires authentication: add a Hugging Face token in Settings → Hugging Face."
+                                ))
+                            }
+                        }
                     }
                 }
             } catch {
+                sampler?.stop()
                 await MainActor.run {
                     self.installProcess = nil
                     self.isInstalling = false
@@ -1075,11 +1322,9 @@ public class SplashService: ObservableObject {
             
             // Sync shell environment so terminal commands use the correct port
             if self.isRunning {
-                if port != 8000 {
-                    self.syncShellEnvironment(port: port)
-                } else {
-                    self.clearShellEnvironment()
-                }
+                // Always (re)write the env file: it now also carries the Hugging Face
+                // exports, so deleting it at the default port would drop the token.
+                self.syncShellEnvironment(port: port)
             }
             
             self.isStartingServer = false
@@ -1095,20 +1340,37 @@ public class SplashService: ObservableObject {
     
     // MARK: - Shell Environment Sync
     
-    /// Write SPLASH_PORT env vars to ~/.splash_monitor_env so terminal commands
-    /// (splash claude, splash codex, etc.) connect to the correct port.
+    /// Write the active port and the Hugging Face variables to `~/.splash_monitor_env`
+    /// so terminal commands (`splash claude`, `splash codex`, raw `huggingface_hub`
+    /// scripts) connect to the right port and download with the same token/speed-up
+    /// as the app.
+    ///
+    /// The file contains the token, so it is written with `0600` permissions and is
+    /// rewritten (never left behind) when the token is removed.
     public func syncShellEnvironment(port: Int) {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let envFile = home.appendingPathComponent(".splash_monitor_env")
-        let envContent = """
-        # Splash Monitor — auto-generated environment (do not edit manually)
-        # Generated by Splash Monitor for port \(port)
-        export SPLASH_PORT="\(port)"
-        export ANTHROPIC_BASE_URL="http://127.0.0.1:\(port)"
-        export OPENAI_BASE_URL="http://127.0.0.1:\(port)/v1"
-        """
         
+        var lines = [
+            "# Splash Monitor — auto-generated environment (do not edit manually)",
+            "# Generated by Splash Monitor for port \(port)",
+            "export SPLASH_PORT=\"\(port)\"",
+            "export ANTHROPIC_BASE_URL=\"http://127.0.0.1:\(port)\"",
+            "export OPENAI_BASE_URL=\"http://127.0.0.1:\(port)/v1\""
+        ]
+        
+        if let token = currentHFToken() {
+            lines.append("")
+            lines.append("# Hugging Face — authenticated downloads (token kept in the macOS Keychain)")
+            lines.append("export HF_TOKEN=\"\(token)\"")
+            lines.append("export HUGGING_FACE_HUB_TOKEN=\"$HF_TOKEN\"")
+            lines.append("export HF_HUB_ENABLE_HF_TRANSFER=\"\(isHFTransferAvailable ? 1 : 0)\"")
+        }
+        
+        let envContent = lines.joined(separator: "\n") + "\n"
         try? envContent.write(to: envFile, atomically: true, encoding: .utf8)
+        // The token lives in this file: keep it owner-only.
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: envFile.path)
         
         // Inject source line into .zshrc if not already present
         let zshrc = home.appendingPathComponent(".zshrc")
@@ -1121,7 +1383,7 @@ public class SplashService: ObservableObject {
         }
     }
     
-    /// Remove shell environment file when server goes back to default port
+    /// Remove the generated shell environment file entirely (including the token export).
     public func clearShellEnvironment() {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let envFile = home.appendingPathComponent(".splash_monitor_env")

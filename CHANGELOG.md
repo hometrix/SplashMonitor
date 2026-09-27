@@ -5,6 +5,17 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [Unreleased]
+
+### 🚀 Novedades y Características
+
+- **Token de Hugging Face en el Llavero (`SplashMonitor.hf`):** Nueva tarjeta "Hugging Face — Descargas Autenticadas" en Configuración con campo enmascarado, botón **Probar token** (valida contra `https://huggingface.co/api/whoami-v2` y muestra la cuenta), botón Eliminar y acceso directo a la página de creación de tokens. El token se guarda en el Llavero de macOS, nunca en `UserDefaults`, nunca se muestra completo (solo `hf_••••cdef`) y se redacta si apareciera en la salida del descargador.
+- **Descargas autenticadas y más rápidas:** `installModel` ahora construye explícitamente el entorno del proceso `prepare` (antes heredaba el de launchd) inyectando `HF_TOKEN` y `HUGGING_FACE_HUB_TOKEN` junto a un `PATH` completo. Las descargas dejan de sufrir el límite de tasa anónimo y los repos gated o privados dejan de fallar con un error opaco.
+- **Detección de `hf_transfer`:** La app comprueba con el intérprete Python del motor si `import hf_transfer` funciona y solo entonces activa `HF_HUB_ENABLE_HF_TRANSFER=1`; si falta, cae silenciosamente al descargador estándar y Configuración muestra la pista `python -m pip install hf_transfer` con botón de reverificación.
+- **Puente con la terminal:** `~/.splash_monitor_env` ahora exporta `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN` y `HF_HUB_ENABLE_HF_TRANSFER`, se escribe con permisos `0600` y se reescribe (en vez de borrarse) al quitar el token o al arrancar en el puerto 8000, para que `splash claude`/`splash codex` y cualquier script con `huggingface_hub` descarguen igual de rápido.
+- **Velocidad de descarga visible:** El log de instalación muestra una línea viva con la velocidad estimada —medida por el crecimiento del caché de Hugging Face del repositorio, independiente del backend (`requests`, `hf_transfer`, `xet`)— y un resumen final con media y pico.
+- **Mensaje accionable en repos gated (401/403):** Al detectar autenticación rechazada, el log distingue si falta el token ("añade un token en Configuración → Hugging Face") o si el token existe pero no tiene acceso al repositorio o falta aceptar la licencia del modelo.
+
 ## [1.0.2-beta] - 2026-09-24
 
 ### 🚀 Novedades y Características

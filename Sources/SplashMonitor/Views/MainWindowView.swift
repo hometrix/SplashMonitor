@@ -7,6 +7,9 @@ public struct MainWindowView: View {
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon: Bool = true
     @AppStorage("hasAskedAboutMenuBar") private var hasAskedAboutMenuBar: Bool = false
     @State private var selectedSidebarItem: SidebarItem = .dashboard
+    /// Write-only field for a new Hugging Face token. The stored token is never
+    /// pre-filled here (only its masked preview is shown) so the secret stays in the Keychain.
+    @State private var hfTokenInput: String = ""
     
     public enum SidebarItem: String, CaseIterable, Identifiable {
         case dashboard
@@ -350,6 +353,9 @@ public struct MainWindowView: View {
             
             Divider()
             
+            // Hugging Face token: authenticated, faster (and gated-capable) downloads
+            hfTokenCard
+            
             // Language Settings
             VStack(alignment: .leading, spacing: 8) {
                 Text(loc.isSpanish ? "Idioma de la Aplicación" : "Application Language")
@@ -542,5 +548,200 @@ public struct MainWindowView: View {
             .background(Color(nsColor: .controlBackgroundColor))
             .cornerRadius(10)
         }
+        .onAppear {
+            // The Keychain is the source of truth: refresh the badge and the
+            // hf_transfer detection every time Settings is opened.
+            service.refreshHFTokenState()
+            service.refreshHFTransferAvailability()
+        }
+    }
+    
+    // MARK: - Hugging Face Token Card
+    private var hfTokenCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(tr(es: "Hugging Face — Descargas Autenticadas", en: "Hugging Face — Authenticated Downloads"))
+                    .font(.system(size: 13, weight: .semibold))
+                
+                Spacer()
+                
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(service.hasHFToken ? Color.green : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(service.hasHFToken
+                         ? (service.hfTokenPreview ?? tr(es: "Guardado", en: "Stored"))
+                         : tr(es: "Sin token", en: "No token"))
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(service.hasHFToken ? .green : .orange)
+                }
+            }
+            
+            Text(tr(
+                es: "Un token de Hugging Face acelera las descargas (evita el límite de tasa anónimo), da acceso a repos gated o privados y activa el descargador Rust hf_transfer cuando está instalado. Se guarda en el Llavero de macOS (servicio SplashMonitor.hf) — nunca en UserDefaults ni en los logs.",
+                en: "A Hugging Face token speeds up downloads (it lifts the anonymous rate limit), unlocks gated or private repos and enables the Rust hf_transfer downloader when installed. It is stored in the macOS Keychain (service SplashMonitor.hf) — never in UserDefaults or logs."
+            ))
+            .font(.system(size: 10))
+            .foregroundColor(.secondary)
+            
+            HStack(spacing: 6) {
+                SecureField(tr(es: "hf_… (pegar token)", en: "hf_… (paste token)"), text: $hfTokenInput)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11, design: .monospaced))
+                    .onSubmit { saveHFToken() }
+                
+                Button(tr(es: "Guardar", en: "Save")) {
+                    saveHFToken()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .disabled(hfTokenInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                
+                Button {
+                    Task { await service.testHFToken() }
+                } label: {
+                    if service.isTestingHFToken {
+                        HStack(spacing: 4) {
+                            ProgressView().controlSize(.mini)
+                            Text(tr(es: "Probando…", en: "Testing…"))
+                        }
+                    } else {
+                        Text(tr(es: "Probar token", en: "Test token"))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(!service.hasHFToken || service.isTestingHFToken)
+                
+                if service.hasHFToken {
+                    Button(role: .destructive) {
+                        removeHFToken()
+                    } label: {
+                        Text(tr(es: "Eliminar", en: "Remove"))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                
+                Spacer()
+                
+                Link(destination: HuggingFaceSupport.tokenSettingsURL) {
+                    HStack(spacing: 3) {
+                        Text(tr(es: "Crear token", en: "Create token"))
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                    .font(.system(size: 10))
+                }
+            }
+            
+            if let status = hfTokenStatus {
+                HStack(spacing: 5) {
+                    Image(systemName: status.icon)
+                        .font(.system(size: 10))
+                        .foregroundColor(status.color)
+                    Text(status.text)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(status.color)
+                        .textSelection(.enabled)
+                }
+            }
+            
+            Divider()
+            
+            // hf_transfer availability in the engine's Python environment
+            HStack(spacing: 5) {
+                if service.isCheckingHFTransfer {
+                    ProgressView().controlSize(.mini)
+                } else {
+                    Image(systemName: service.isHFTransferAvailable ? "bolt.fill" : "bolt.slash")
+                        .font(.system(size: 10))
+                        .foregroundColor(service.isHFTransferAvailable ? .green : .secondary)
+                }
+                
+                Text(service.isHFTransferAvailable
+                     ? tr(es: "hf_transfer detectado: las descargas lanzadas desde la app usan el backend Rust.", en: "hf_transfer detected: downloads started from the app use the Rust backend.")
+                     : tr(es: "hf_transfer no está instalado en el entorno del motor; las descargas funcionan, pero más lentas.", en: "hf_transfer is not installed in the engine environment; downloads still work, just slower."))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                
+                if !service.isHFTransferAvailable, !service.splashPythonPath.isEmpty {
+                    Text("\(service.splashPythonPath) -m pip install hf_transfer")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .textSelection(.enabled)
+                }
+                
+                Spacer()
+                
+                Button {
+                    service.refreshHFTransferAvailability()
+                } label: {
+                    Text(tr(es: "Verificar", en: "Recheck"))
+                        .font(.system(size: 10))
+                }
+                .buttonStyle(.borderless)
+                .disabled(service.isCheckingHFTransfer)
+            }
+        }
+        .padding(14)
+        .background(Color(nsColor: .controlBackgroundColor))
+        .cornerRadius(10)
+    }
+    
+    /// Colour-coded message under the token field (Keychain error, test outcome).
+    private var hfTokenStatus: (text: String, color: Color, icon: String)? {
+        if let error = service.hfTokenError {
+            return (
+                tr(es: "No se pudo guardar en el Llavero: \(error)", en: "Could not save to the Keychain: \(error)"),
+                .red,
+                "exclamationmark.triangle.fill"
+            )
+        }
+        switch service.hfTokenTestResult {
+        case .success(let user):
+            return (
+                tr(es: "Token válido — cuenta: \(user)", en: "Valid token — account: \(user)"),
+                .green,
+                "checkmark.seal.fill"
+            )
+        case .invalidToken(let code):
+            return (
+                tr(es: "Hugging Face rechazó el token (HTTP \(code)). Genera uno nuevo con permiso de lectura.",
+                   en: "Hugging Face rejected the token (HTTP \(code)). Create a new one with read access."),
+                .red,
+                "xmark.seal.fill"
+            )
+        case .networkError(let message):
+            return (
+                tr(es: "No se pudo verificar el token: \(message)", en: "Could not verify the token: \(message)"),
+                .orange,
+                "exclamationmark.triangle.fill"
+            )
+        case .noToken:
+            return (
+                tr(es: "Añade un token para poder probarlo.", en: "Add a token to test it."),
+                .secondary,
+                "info.circle"
+            )
+        case .none:
+            return nil
+        }
+    }
+    
+    /// Persist the typed token and immediately validate it.
+    private func saveHFToken() {
+        let value = hfTokenInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        if service.setHFToken(value) {
+            // Never keep the secret in the view state after it reaches the Keychain.
+            hfTokenInput = ""
+            Task { await service.testHFToken() }
+        }
+    }
+    
+    /// Drop the stored token (Keychain + shell env export).
+    private func removeHFToken() {
+        service.setHFToken(nil)
+        hfTokenInput = ""
     }
 }

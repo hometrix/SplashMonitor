@@ -77,6 +77,7 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 - Catálogo de modelos locales instalados con espacio en disco
 - Explorador del catálogo en vivo de [Hugging Face](https://huggingface.co/incoai)
 - Instalación de modelos con un clic y salida de terminal en vivo
+- Token de Hugging Face en el Llavero de macOS: descargas autenticadas (más rápidas), repos gated y backend rápido `hf_transfer`
 
 </td>
 <td width="50%" valign="top">
@@ -356,6 +357,7 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 - Local installed models catalog with disk usage
 - Live [Hugging Face](https://huggingface.co/incoai) catalog explorer
 - One-click model installation with live terminal output
+- Hugging Face token in the macOS Keychain: authenticated (faster) downloads, gated repos and the fast `hf_transfer` backend
 
 </td>
 <td width="50%" valign="top">
