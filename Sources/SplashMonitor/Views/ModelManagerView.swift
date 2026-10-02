@@ -394,16 +394,17 @@ public struct ModelManagerView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(Array(service.installLogs.enumerated()), id: \.offset) { idx, log in
                             Text(log)
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.primary.opacity(0.85))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.92))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(idx)
                         }
                     }
-                    .padding(6)
+                    .padding(8)
+                    .textSelection(.enabled)
                 }
-                .frame(height: 70)
-                .background(Color.black.opacity(0.75))
+                .frame(height: 90)
+                .background(Color.black.opacity(0.85))
                 .cornerRadius(6)
                 .onChange(of: service.installLogs.count) { _ in
                     if let last = service.installLogs.indices.last {
