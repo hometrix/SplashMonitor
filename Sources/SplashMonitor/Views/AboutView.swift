@@ -96,6 +96,23 @@ public struct AboutView: View {
                     }
                     
                     Spacer()
+                    
+                    Button {
+                        if let url = URL(string: "https://buymeacoffee.com/hometrix9") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "cup.and.saucer.fill")
+                                .font(.system(size: 10))
+                            Text(tr(es: "Invitar un café", en: "Buy Me a Coffee"))
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.orange)
+                    .controlSize(.small)
+                    .help(tr(es: "Apoyar el proyecto en Buy Me a Coffee", en: "Support the project on Buy Me a Coffee"))
                 }
             }
             .padding(14)

@@ -21,6 +21,7 @@
 [![Download DMG](https://img.shields.io/badge/Download-DMG%20Installer-success?style=for-the-badge&logo=apple)](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.4-beta/SplashMonitor-1.0.4-beta.dmg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![Author](https://img.shields.io/badge/Author-JMGREP%20Developers%20%7C%20Joan%20Gregorio%20P%C3%A9rez-00205B?style=for-the-badge)](#-autor--author)
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Donate-yellow?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hometrix9)
 
 <br/>
 
@@ -385,6 +386,18 @@ SplashMonitor/
 **Agradecimientos especiales:**
 - [Inco AI](https://inco.ai/blog/splash/) — Motor de inferencia Splash
 - [Hugging Face](https://huggingface.co/incoai) — Catálogo de modelos
+
+---
+
+### 💖 Apoyar el Proyecto
+
+Si **Splash Monitor** te resulta útil para tus flujos de trabajo de IA local y desarrollo con agentes, ¡considera apoyar su desarrollo continuo invitándome a un café! Cada aporte ayuda a mantener el proyecto actualizado, probado y optimizado para Apple Silicon.
+
+<p align="left">
+  <a href="https://buymeacoffee.com/hometrix9" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="46" />
+  </a>
+</p>
 
 ---
 
@@ -768,6 +781,18 @@ Asegúrate de que:
 **Special Thanks:**
 - [Inco AI](https://inco.ai/blog/splash/) — Splash inference engine
 - [Hugging Face](https://huggingface.co/incoai) — Model catalog
+
+---
+
+### 💖 Support the Project
+
+If you find **Splash Monitor** valuable for your local AI workflows and autonomous coding agents, consider supporting its ongoing development by buying me a coffee! Every contribution helps keep the project updated, tested, and fine-tuned for Apple Silicon.
+
+<p align="left">
+  <a href="https://buymeacoffee.com/hometrix9" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="46" />
+  </a>
+</p>
 
 ---
 
