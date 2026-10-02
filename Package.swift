@@ -18,6 +18,11 @@ let package = Package(
             name: "SplashMonitor",
             dependencies: [],
             path: "Sources/SplashMonitor"
+        ),
+        .testTarget(
+            name: "SplashMonitorTests",
+            dependencies: ["SplashMonitor"],
+            path: "Tests/SplashMonitorTests"
         )
     ]
 )

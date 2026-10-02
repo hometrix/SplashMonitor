@@ -5,6 +5,67 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.4-beta] - 2026-10-02
+
+Versión orientada a la integración nativa de agentes visuales y autónomos en macOS,
+destacando el soporte oficial de **Claude Cowork** (modo colaborativo de Claude for Mac)
+y la generación integral de capturas de pantalla de todos los módulos de la aplicación.
+
+### 🚀 Novedades y Características
+
+- **Lanzador Oficial de Claude Cowork:** Integración del nuevo botón interactivo en el panel de *Servidor y Agentes*, con activación nativa de `/Applications/Claude.app` mediante AppKit (`NSWorkspace.shared.openApplication`).
+- **Mapeo de Aliases de Modelo en Splash (`--served-model-name`):** `startServer()` ahora inyecta automáticamente los nombres de modelo de sondeo requeridos por Claude Desktop y Cowork (`claude-haiku-4-5`, `claude-3-5-sonnet-latest`, `claude-sonnet-4-5`). Esto elimina los errores HTTP 404 de "Model not found" que ocurrían al conectar el Gateway local.
+- **Detección Automática de Claude Desktop / Cowork:** El monitor de conexiones activas (`scanConnectedClients`) ahora reconoce el proceso `com.anthropic.claudefordesktop`, clasificándolo como Agente de Código Autónomo con su icono oficial de macOS y estadísticas de sockets TCP.
+- **Tarjeta de Guía de Integración para Claude Gateway:** Se añadió una tarjeta dedicada en la pestaña de Guía de Conexión de *Apps Conectadas* explicando cómo configurar el Gateway local en Claude for Mac (`http://127.0.0.1:<puerto>`).
+- **Galería Visual de Todos los Módulos:** Se añadieron capturas de pantalla en alta resolución para cada módulo en el repositorio con documentación explicativa.
+- **Ampliación de Pruebas Unitarias:** Se añadieron suites de prueba automáticas (`AgentLaunchTests` y `ScreenshotGeneratorTests`), alcanzando 68 pruebas automatizadas passing.
+
+## [1.0.3-beta] - 2026-09-24
+
+Versión de corrección derivada de la auditoría integral de la 1.0.2-beta. Se corrigieron
+los cuatro defectos bloqueantes, se añadió la red de pruebas que faltaba (no existía
+ninguna) y se cerró la clase de errores de distribución que publicaba artefactos con la
+versión equivocada.
+
+### 🔒 Seguridad
+
+- **Inyección de comandos por identificador de modelo (P-03, crítico):** `startServer()` interpolaba el identificador de modelo dentro de un script de shell. Un valor como `incoai/x" ; touch /tmp/testigo ; echo "` cerraba el entrecomillado y ejecutaba comandos arbitrarios con los privilegios del usuario; verificado en la auditoría con un fichero testigo. Ahora todo identificador se valida (`ModelIDValidator`) con las mismas restricciones que impone el motor a sus alias, y la interfaz avisa antes de intentar arrancar. La misma validación protege `installModel` y `deleteModel`, donde un valor con `../` borraba archivos fuera del directorio de modelos.
+- **Se dejó de matar procesos ajenos (P-01, crítico):** al detener el servidor se ejecutaba `lsof -ti :<puerto>` seguido de `SIGKILL` a **todos** los PIDs devueltos, incluidos los clientes conectados (agentes, IDEs, túneles SSH y cualquier otro proceso que escuchara en ese puerto). Medido: con un servidor y un cliente en procesos distintos, `lsof -ti :<puerto>` devuelve los dos. Ahora solo se señalizan **escuchas verificadas** (`lsof -tiTCP:<puerto> -sTCP:LISTEN`) cuya línea de comandos pertenezca al motor, con escalada `SIGINT` → `SIGTERM` → `SIGKILL`.
+- **Fin de los `pkill -f` genéricos (P-06):** se eliminaron `pkill -INT -f "splash serve"`, `pkill -f server.py` y `pkill -9`, que alcanzan cualquier proceso del sistema cuya línea de comandos contenga esos patrones, incluidos servidores de otros proyectos.
+- **Terminación de apps conectadas con verificación y confirmación (P-04):** el botón «Terminar» enviaba `SIGTERM` al primer clic, sin confirmación y sin comprobar que el PID siguiera siendo la misma aplicación (un PID reciclado apuntaba a otro proceso). Ahora pide confirmación, reverifica el bundle identifier y nunca actúa sobre el propio monitor.
+- **Escritura en `~/.zshrc` con consentimiento y reversible (P-09):** la app modificaba el perfil del shell sin avisar y sin forma de deshacerlo. Ahora pide permiso la primera vez (con opción «no volver a preguntar»), y Configuración ofrece deshacer con una reversión exacta de la inyección. El fichero `~/.splash_monitor_env` se sigue escribiendo siempre, porque los agentes de terminal lo necesitan.
+- **Liberación de puerto con reverificación de identidad:** al resolver un conflicto de puerto se comprueba que el PID siga siendo el proceso detectado antes de señalizarlo, y se usa `SIGTERM` antes de `SIGKILL`.
+
+### 🐛 Correcciones
+
+- **El panel dejaba de actualizarse para siempre (P-02, crítico):** `stopServerAsync()` invalidaba el temporizador de sondeo y **ninguna ruta lo recreaba**. Tras pulsar «Detener Servidor» una sola vez, la aplicación dejaba de reflejar el estado durante el resto de la sesión, y un motor arrancado después (desde la terminal o por un agente) nunca se detectaba. Ahora, al detener el servidor queda armado un vigía de recuperación que rearma el sondeo en cuanto aparece un motor vivo.
+- **Comparación de versiones rota (P-07):** se comparaban versiones con `String >` (orden lexicográfico), de modo que `1.0.10-beta` se consideraba **anterior** a `1.0.2-beta` y la app dejaba de anunciar actualizaciones a partir de la décima revisión. Ahora hay comparación semántica real (`SemanticVersion`).
+- **Bloqueo del motor que nunca se leía (P-08):** la app buscaba `runtime/serve.lock`, pero el motor 1.0.2 escribe `runtime/serve-<puerto>.lock`; el fichero histórico llega con 0 bytes, de modo que la lectura siempre devolvía `nil`. Ahora se consideran ambos nombres, se ignora lo vacío o corrupto y se limpian los bloqueos huérfanos (con un margen de 5 minutos para no tocar un motor en arranque).
+- **E/S síncrona del sondeo (P-12):** cada ciclo de 1,5 s reescaneaba el árbol de modelos resolviendo symlinks desde el `@MainActor`. Medido sobre los modelos reales del equipo (3 modelos, 215 ficheros, 55,7 GB): 7,5 ms por ciclo, unas 430 s de E/S síncrona acumulada en 24 h con la app abierta. Ahora los tamaños se cachean por modelo y se invalidan al cambiar el enlace, y el catálogo se reescanea como mucho una vez cada 10 ciclos.
+- **Regla contradictoria del entorno (P-13):** `startServer()` borraba `~/.splash_monitor_env` cuando el puerto era 8000 mientras `checkServerStatus()` lo escribía para ese mismo puerto. Queda una política única: se sincroniza siempre.
+- **Detección de agentes en segundo plano:** el escaneo de conexiones TCP ahora ejecuta solo el comando externo fuera del actor principal y consulta AppKit (`NSRunningApplication`) donde corresponde, en lugar de hacerlo desde un hilo de fondo.
+- **Residuos de versiones anteriores (P-17):** al arrancar se elimina `splash_launcher.py`, el *bridge launcher* retirado en 1.0.1 que seguía en disco tras actualizar.
+
+### 📦 Distribución
+
+- **Versión única (P-15):** la versión se declaraba en cinco lugares (servicio Swift, `Info.plist`, DMG, instalador y README) y ya había divergido entre sí: el README anunciaba 1.0.0-beta y el binario compilaba 1.0.2-beta. Ahora `Sources/SplashMonitor/Services/Version.swift` es la única fuente, y los tres scripts extraen de ahí la versión, el identificador de paquete y el número de compilación.
+- **Instalador sin versión fija (P-05):** `install.sh` fijaba `v1.0.2-beta`. Ahora consulta la última publicación, permite fijar una versión con `SPLASH_MONITOR_TAG` y **verifica la suma SHA-256** de la descarga contra el fichero `SHA256SUMS` publicado, abortando si no coincide. El README advierte de que el cask del tap puede quedarse atrás.
+- **Suma de verificación publicable (P-18):** `create_dmg.sh` genera `SHA256SUMS` junto al DMG y comprueba que el bundle contiene la misma versión que declara el código, recompilando si no coincide. Se eliminó `codesign --deep` (obsoleto) y la firma se aplica en orden: binario y después bundle.
+- **Identificador de paquete propio (P-11):** `com.incoai.splashmonitor` reclamaba el espacio de nombres de IncoAI para un monitor que es software independiente. Ahora es `do.jmgrep.splashmonitor`.
+- **Integración continua:** nuevo flujo de GitHub Actions que compila, ejecuta las pruebas, valida el modo Swift 6, construye el bundle y el DMG, y verifica la suma publicada.
+
+### 🧪 Pruebas
+
+- **Se pasó de 0 a 65 pruebas automatizadas** (`swift test`). La aplicación no tenía ninguna. Las pruebas son herméticas: transporte de estado simulado, terminador de procesos simulado, directorio temporal propio y `bootstrapNetwork: false` (sin tráfico a Hugging Face ni a GitHub). Ninguna prueba envía señales a procesos reales ni escribe en el `~/.zshrc` del usuario.
+- **Modo Swift 6:** el paquete compilaba con 5 errores de concurrencia (`Localization.shared` y `ConnectedApp` no `Sendable`) y ahora compila limpio en modo Swift 6 (`swift build -Xswiftc -swift-version -Xswiftc 6`), verificado también en la batería de pruebas. No se cambió la versión del manifiesto para no romper Xcode 15.
+- Cada corrección tiene una prueba que la protege y se verificó en rojo→verde: se reintrodujo cada defecto original en el código, se comprobó que la prueba falla, y se restauró el fichero verificando su hash (**10/10 defectos detectados**).
+
+### ⚠️ Limitaciones conocidas
+
+- **La firma es ad-hoc.** No hay notarización de Apple: el primer arranque requiere el paso manual de «Abrir de todas formas» descrito en el README. La firma ad-hoc no acredita autoría criptográficamente.
+- **El cask de Homebrew** vive en el repositorio del tap (`hometrix/homebrew-tap`) y debe actualizarse por separado; el README ahora lo advierte y las Opciones B y C no dependen de él.
+- **El paquete de disciplina de prompt** para modelos pequeños no se ha incorporado: es un cambio de comportamiento del motor (no de la app) y requiere una decisión aparte. El motor no admite instrucciones del lado del servidor, así que solo puede aplicarse como primer mensaje `role: "system"` del cliente.
+
 ## [1.0.2-beta] - 2026-09-24
 
 ### 🚀 Novedades y Características

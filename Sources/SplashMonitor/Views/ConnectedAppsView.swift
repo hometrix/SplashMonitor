@@ -21,8 +21,9 @@ public struct ConnectedAppsView: View {
         }
     }
     
-    public init(service: SplashService) {
+    public init(service: SplashService, initialTab: ConnectedAppsTab = .detected) {
         self.service = service
+        self._selectedTab = State(initialValue: initialTab)
     }
     
     public var body: some View {
@@ -194,8 +195,8 @@ public struct ConnectedAppsView: View {
                 .font(.system(size: 14, weight: .semibold))
             
             Text(tr(
-                es: "Aún no hay clientes conectados al puerto \(service.activePort).\nPuedes conectar Cursor, VS Code, Claude Code, OpenCode, Hermes o cualquier app compatible con la API de OpenAI.",
-                en: "No clients connected to port \(service.activePort) yet.\nYou can connect Cursor, VS Code, Claude Code, OpenCode, Hermes, or any OpenAI API compatible app."
+                es: "Aún no hay clientes conectados al puerto \(service.activePort).\nPuedes conectar Cursor, VS Code, Claude Code, Claude Cowork, OpenCode, Hermes o cualquier app compatible con la API de OpenAI.",
+                en: "No clients connected to port \(service.activePort) yet.\nYou can connect Cursor, VS Code, Claude Code, Claude Cowork, OpenCode, Hermes, or any OpenAI API compatible app."
             ))
             .font(.system(size: 11))
             .foregroundColor(.secondary)
@@ -297,6 +298,21 @@ public struct ConnectedAppsView: View {
                 )
                 
                 IntegrationGuideCard(
+                    title: "Claude Desktop / Cowork",
+                    subtitle: tr(es: "App nativa con Gateway local", en: "macOS native App with Local Gateway"),
+                    icon: "person.2.badge.gearshape.fill",
+                    badge: "Anthropic / Cowork",
+                    color: .orange,
+                    steps: [
+                        tr(es: "1. En Claude for Mac, selecciona tu Gateway local", en: "1. In Claude for Mac, select your local Gateway"),
+                        tr(es: "2. Host / Endpoint URL:", en: "2. Host / Endpoint URL:"),
+                        "http://127.0.0.1:\(service.activePort)",
+                        tr(es: "3. Splash responderá a sondeos de claude-haiku-4-5 y sonnet", en: "3. Splash responds to claude-haiku-4-5 & sonnet probes")
+                    ],
+                    copyText: "http://127.0.0.1:\(service.activePort)"
+                )
+                
+                IntegrationGuideCard(
                     title: "Chatbox / NextChat / WebUI",
                     subtitle: tr(es: "Interfaces de Chatbot para macOS", en: "macOS Chatbot Interfaces"),
                     icon: "bubble.left.and.bubble.right.fill",
@@ -369,6 +385,8 @@ struct ConnectedAppCard: View {
     let service: SplashService
     let loc: Localization
     @State private var isHovered: Bool = false
+    /// P-04: la terminación de una app conectada exige confirmación explícita.
+    @State private var confirmingTermination: Bool = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -479,7 +497,7 @@ struct ConnectedAppCard: View {
                 .help(loc.isSpanish ? "Ver en Finder" : "Reveal in Finder")
                 
                 Button(role: .destructive) {
-                    service.terminateApp(app: app)
+                    confirmingTermination = true
                 } label: {
                     Image(systemName: "xmark.circle")
                         .font(.system(size: 12))
@@ -496,6 +514,23 @@ struct ConnectedAppCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(app.status == .active ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1)
         )
+        // P-04 / H-05: antes el botón «Terminar» enviaba SIGTERM al primer clic y sin
+        // confirmación. Un clic accidental cerraba el cliente del usuario.
+        .confirmationDialog(
+            loc.isSpanish ? "¿Terminar \(app.name)?" : "Terminate \(app.name)?",
+            isPresented: $confirmingTermination,
+            titleVisibility: .visible
+        ) {
+            Button(loc.isSpanish ? "Terminar proceso (PID \(app.pid))" : "Terminate process (PID \(app.pid))",
+                   role: .destructive) {
+                service.terminateApp(app: app)
+            }
+            Button(loc.isSpanish ? "Cancelar" : "Cancel", role: .cancel) {}
+        } message: {
+            Text(loc.isSpanish
+                 ? "Se enviará una orden de cierre a \(app.name) (PID \(app.pid)). Guarda su trabajo antes de continuar. La aplicación decidirá cómo cerrarse."
+                 : "A shutdown request will be sent to \(app.name) (PID \(app.pid)). Save its work before continuing. The application decides how to close.")
+        }
     }
     
     private func categoryColor(_ cat: AppCategory) -> Color {

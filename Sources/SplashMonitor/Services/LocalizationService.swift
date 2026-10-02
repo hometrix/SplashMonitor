@@ -23,6 +23,7 @@ public enum AppLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+@MainActor
 public class Localization: ObservableObject {
     public static let shared = Localization()
     
@@ -39,15 +40,18 @@ public class Localization: ObservableObject {
         // Detect and react to macOS system language/locale changes in real time
         NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)
             .sink { [weak self] _ in
-                DispatchQueue.main.async {
+                // El cambio se publica desde el actor principal: la clase es @MainActor
+                // y su estado no puede tocarse desde el contexto del emisor (Swift 6).
+                Task { @MainActor in
                     self?.objectWillChange.send()
                 }
             }
             .store(in: &cancellables)
     }
     
-    /// Detect the primary language of the macOS system
-    public static func detectSystemLanguage() -> String {
+    /// Detect the primary language of the macOS system.
+    /// `nonisolated`: función pura sobre `Locale`, invocable desde cualquier contexto.
+    nonisolated public static func detectSystemLanguage() -> String {
         let preferred = Locale.preferredLanguages.first?.lowercased() ?? ""
         if preferred.hasPrefix("es") {
             return "es"
@@ -94,6 +98,7 @@ public class Localization: ObservableObject {
 }
 
 // Convenience global helper
+@MainActor
 public func tr(es: String, en: String) -> String {
     return Localization.shared.text(es: es, en: en)
 }

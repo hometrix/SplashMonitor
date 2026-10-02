@@ -41,8 +41,9 @@ public struct MainWindowView: View {
         }
     }
     
-    public init(service: SplashService) {
+    public init(service: SplashService, initialTab: SidebarItem = .dashboard) {
         self.service = service
+        self._selectedSidebarItem = State(initialValue: initialTab)
     }
     
     public var body: some View {
@@ -392,6 +393,49 @@ public struct MainWindowView: View {
                         Text(loc.isSpanish ? "Ícono + Modelo" : "Icon + Model").tag("model")
                     }
                     .pickerStyle(.radioGroup)
+                    .font(.system(size: 11))
+                }
+            }
+            .padding(14)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(10)
+            
+            // Shell integration (P-09)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(loc.isSpanish ? "Integración con el Shell" : "Shell Integration")
+                    .font(.system(size: 13, weight: .semibold))
+                
+                Toggle(loc.isSpanish
+                       ? "Permitir a Splash Monitor añadir una línea a tu ~/.zshrc"
+                       : "Allow Splash Monitor to add a line to your ~/.zshrc",
+                       isOn: Binding(
+                            get: { service.shellConfigConsent },
+                            set: { allowed in
+                                service.shellConfigConsent = allowed
+                                service.shellConfigDeclined = !allowed
+                                if allowed {
+                                    service.syncShellEnvironment(port: service.activePort)
+                                } else {
+                                    service.clearShellEnvironment()
+                                }
+                            }
+                       ))
+                    .font(.system(size: 12))
+                
+                Text(loc.isSpanish
+                     ? "Sin esta línea, los agentes lanzados desde una terminal externa no heredan el puerto activo. El fichero ~/.splash_monitor_env se escribe siempre, con o sin permiso."
+                     : "Without this line, agents launched from an external terminal do not inherit the active port. The ~/.splash_monitor_env file is always written, with or without permission.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                
+                if service.shellConfigConsent {
+                    Button(loc.isSpanish ? "Deshacer cambios en ~/.zshrc" : "Undo changes to ~/.zshrc") {
+                        service.clearShellEnvironment()
+                        service.shellConfigConsent = false
+                        service.shellConfigDeclined = true
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                     .font(.system(size: 11))
                 }
             }

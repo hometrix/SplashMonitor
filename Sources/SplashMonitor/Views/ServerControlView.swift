@@ -20,6 +20,17 @@ public struct ServerControlView: View {
         self.service = service
     }
     
+    /// Error de validación del identificador personalizado (P-03).
+    /// `nil` = válido o campo no utilizado. Misma regla que aplica el servicio.
+    private var customModelError: String? {
+        guard isCustomModel else { return nil }
+        let value = customModelText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty {
+            return tr(es: "Escribe un identificador owner/repo.", en: "Enter an owner/repo identifier.")
+        }
+        return ModelIDValidator.rejectionReason(value)
+    }
+    
     public var body: some View {
         VStack(spacing: 12) {
             // 0. Dependency missing alert if needed
@@ -69,14 +80,15 @@ public struct ServerControlView: View {
                 let url = service.agentInstallURL(agent: pendingAgentCommand)
                 NSWorkspace.shared.open(url)
             }
-            Button(tr(es: "Lanzar en Terminal de Todos Modos", en: "Launch in Terminal Anyway")) {
+            Button(tr(es: pendingAgentCommand == "claude-cowork" ? "Abrir Claude de Todos Modos" : "Lanzar en Terminal de Todos Modos",
+                      en: pendingAgentCommand == "claude-cowork" ? "Open Claude Anyway" : "Launch in Terminal Anyway")) {
                 service.launchAgent(agent: pendingAgentCommand)
             }
             Button(tr(es: "Cancelar", en: "Cancel"), role: .cancel) {}
         } message: {
             Text(tr(
-                es: "No se detectó el comando '\(pendingAgentCommand)' en tu sistema. Puedes instalarlo siguiendo la guía oficial.",
-                en: "Command '\(pendingAgentCommand)' was not detected on your system. You can install it following the official guide."
+                es: pendingAgentCommand == "claude-cowork" ? "No se detectó la aplicación Claude for Mac en tu sistema (/Applications/Claude.app). Puedes descargarla desde la web oficial de Claude." : "No se detectó el comando '\(pendingAgentCommand)' en tu sistema. Puedes instalarlo siguiendo la guía oficial.",
+                en: pendingAgentCommand == "claude-cowork" ? "Claude for Mac application was not detected on your system (/Applications/Claude.app). You can download it from the official Claude website." : "Command '\(pendingAgentCommand)' was not detected on your system. You can install it following the official guide."
             ))
         }
         .alert(
@@ -96,6 +108,27 @@ public struct ServerControlView: View {
                     service.resolvePortConflict(killProcess: true)
                 }
             )
+        }
+        .alert(
+            tr(es: "Configurar tu shell", en: "Configure your shell"),
+            isPresented: Binding(
+                get: { service.pendingShellConfigPort != nil },
+                set: { presented in
+                    if !presented { service.pendingShellConfigPort = nil }
+                }
+            )
+        ) {
+            Button(tr(es: "Permitir y configurar", en: "Allow and configure")) {
+                service.resolveShellConfigPrompt(allow: true)
+            }
+            Button(tr(es: "No, gracias", en: "No thanks"), role: .cancel) {
+                service.resolveShellConfigPrompt(allow: false)
+            }
+        } message: {
+            Text(tr(
+                es: "Splash Monitor puede añadir una línea a tu ~/.zshrc para que los agentes lanzados desde una terminal hereden el puerto \(service.pendingShellConfigPort ?? service.activePort). Escribirá en tu configuración personal; podrás deshacerlo desde Configuración. El fichero ~/.splash_monitor_env se escribe siempre.",
+                en: "Splash Monitor can add a line to your ~/.zshrc so agents launched from a terminal inherit port \(service.pendingShellConfigPort ?? service.activePort). This writes to your personal configuration; you can undo it from Settings. The ~/.splash_monitor_env file is always written."
+            ))
         }
         .sheet(isPresented: $showingLogsSheet) {
             VStack(alignment: .leading, spacing: 10) {
@@ -261,6 +294,19 @@ public struct ServerControlView: View {
                     TextField(tr(es: "ej. incoai/Qwen3.8-27B-Splash", en: "e.g. incoai/Qwen3.8-27B-Splash"), text: $customModelText)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 11, design: .monospaced))
+                    
+                    // P-03: aviso inmediato; el botón de arranque queda bloqueado mientras
+                    // el identificador no sea válido, así el usuario no descubre el error
+                    // después de intentar arrancar el motor.
+                    if let error = customModelError {
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 9))
+                            Text(error)
+                                .font(.system(size: 10))
+                        }
+                        .foregroundColor(.orange)
+                    }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
@@ -382,7 +428,7 @@ public struct ServerControlView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.purple)
                         .controlSize(.regular)
-                        .disabled(targetModel.isEmpty)
+                        .disabled(targetModel.isEmpty || customModelError != nil)
                     }
                 } else {
                     Button {
@@ -467,6 +513,17 @@ public struct ServerControlView: View {
                     isServerRunning: service.isRunning
                 ) {
                     handleAgentLaunch(name: "Claude Code", command: "claude")
+                }
+                
+                AgentButton(
+                    name: "Claude Cowork",
+                    icon: "person.2.badge.gearshape",
+                    command: "claude-cowork",
+                    subtitle: "Claude for Mac",
+                    isInstalled: service.isAgentInstalled(agent: "claude-cowork"),
+                    isServerRunning: service.isRunning
+                ) {
+                    handleAgentLaunch(name: "Claude Cowork", command: "claude-cowork")
                 }
                 
                 AgentButton(
@@ -583,6 +640,7 @@ struct AgentButton: View {
     let name: String
     let icon: String
     let command: String
+    var subtitle: String? = nil
     let isInstalled: Bool
     let isServerRunning: Bool
     let action: () -> Void
@@ -604,7 +662,7 @@ struct AgentButton: View {
                             .frame(width: 5, height: 5)
                     }
                     
-                    Text("splash \(command)")
+                    Text(subtitle ?? "splash \(command)")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundColor(.secondary)
                 }

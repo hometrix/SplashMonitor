@@ -23,6 +23,27 @@ public struct PortConflictInfo: Identifiable, Equatable {
 @MainActor
 public class SplashService: ObservableObject {
     public static let shared = SplashService()
+
+    // MARK: - Dependencias inyectables (pruebas y sustitución)
+    /// Transporte HTTP para `/status`. Sustituible para probar el ciclo de sondeo sin motor.
+    public let transport: StatusTransport
+    /// Operaciones destructivas sobre procesos. Las pruebas inyectan un doble que no
+    /// envía señales reales.
+    public let terminator: ServerTerminating
+    /// Intervalo base de sondeo. Las pruebas lo amplían para no depender del reloj.
+    public let pollInterval: TimeInterval
+    /// Raíz de datos de la app. `nil` = `~/Library/Application Support/Splash`.
+    public let dataDirectoryRoot: URL?
+    /// Sustituto del lanzamiento real del motor (escritura de `.command` + `/bin/bash`).
+    public var serverLaunchOverride: ((_ command: String, _ logFile: URL?, _ background: Bool) -> Void)?
+    /// Sustituto de la escritura en el `~/.zshrc` del usuario.
+    public var shellWriteOverride: ((_ contents: String, _ url: URL) -> Void)?
+    /// Directorio donde vive `~/.splash_monitor_env`. `nil` = directorio personal real.
+    /// Las pruebas lo apuntan a un directorio temporal para no escribir en el HOME.
+    public var shellEnvironmentDirectory: URL?
+    /// Omite la comprobación previa de conflictos de puerto (pruebas herméticas:
+    /// evita abrir un socket real y depender del estado de la máquina).
+    public var skipPortConflictCheck: Bool = false
     
     // MARK: - Published State
     @Published public var isRunning: Bool = false
@@ -70,7 +91,7 @@ public class SplashService: ObservableObject {
     @Published public var hasUpdate: Bool = false
     @Published public var latestVersion: String? = nil
     @Published public var latestReleaseURL: String? = nil
-    public let currentVersion = "1.0.2-beta"
+    public let currentVersion = SplashVersion.current
     private let githubRepo = "hometrix/SplashMonitor"
     
     // Agent installation cache (checked async, not on main thread)
@@ -82,21 +103,36 @@ public class SplashService: ObservableObject {
     
     // Timers & Processes
     private var timer: Timer?
+    private var watchdog: Timer?
+    /// Intervalo del vigía de recuperación cuando el servidor está detenido.
+    public var watchdogInterval: TimeInterval { max(5.0, pollInterval * 4) }
+    /// Contador para no reescanear el directorio de modelos en cada ciclo (P-12).
+    private var ticksSinceModelRefresh = 0
+    private var sizeCache = ModelSizeCache()
     private var installProcess: Process?
     private var dependencyProcess: Process?
     
     // Paths
-    public let dataDirectory: URL = {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Splash")
-    }()
+    public let dataDirectory: URL
     
     public var modelsDirectory: URL {
         dataDirectory.appendingPathComponent("models")
     }
     
+    public var runtimeDirectory: URL {
+        dataDirectory.appendingPathComponent("runtime")
+    }
+    
+    /// Ficheros de bloqueo candidatos, en orden de preferencia (P-08).
+    /// El motor 1.0.2 escribe `serve-<puerto>.lock`; `serve.lock` se mantiene como
+    /// compatibilidad con versiones anteriores y suele llegar vacío.
+    public func lockFileURLs(port: Int) -> [URL] {
+        ServeLockStore.candidateFileNames(port: port).map { runtimeDirectory.appendingPathComponent($0) }
+    }
+    
+    /// Ruta histórica; se conserva para depuración y para la limpieza de residuos.
     public var lockFileURL: URL {
-        dataDirectory.appendingPathComponent("runtime/serve.lock")
+        runtimeDirectory.appendingPathComponent("serve.lock")
     }
     
     public var serverLogURL: URL {
@@ -114,135 +150,120 @@ public class SplashService: ObservableObject {
     }
     
     public var brewExecutablePath: String? {
-        let candidates = ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
-        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
-            return p
-        }
-        return nil
+        SplashPaths.firstExisting(SplashPaths.brewExecutableCandidates())
     }
     
     public var splashExecutablePath: String {
-        let candidates = [
-            "/opt/homebrew/bin/splash",
-            "/usr/local/bin/splash",
-            "/opt/homebrew/opt/splash/bin/splash",
-            "/usr/local/opt/splash/bin/splash"
-        ]
-        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
-            return p
-        }
-        return "splash"
+        SplashPaths.firstExisting(SplashPaths.splashExecutableCandidates()) ?? "splash"
     }
     
     public var splashPythonPath: String {
-        let candidates = [
-            "/opt/homebrew/opt/splash/libexec/python/bin/python3",
-            "/usr/local/opt/splash/libexec/python/bin/python3"
-        ]
-        for p in candidates where FileManager.default.fileExists(atPath: p) {
-            return p
+        if let stable = SplashPaths.firstExisting(SplashPaths.pythonCandidates(),
+                                                  exists: { FileManager.default.fileExists(atPath: $0) }) {
+            return stable
         }
-        
-        // Wildcard search for any Cellar version
-        let fm = FileManager.default
-        let cellarRoots = ["/opt/homebrew/Cellar/splash", "/usr/local/Cellar/splash"]
-        for root in cellarRoots where fm.fileExists(atPath: root) {
-            if let versions = try? fm.contentsOfDirectory(atPath: root) {
-                for v in versions {
-                    let py = "\(root)/\(v)/libexec/python/bin/python3"
-                    if fm.fileExists(atPath: py) {
-                        return py
-                    }
-                }
-            }
+        let versions: (String) -> [String]? = { try? FileManager.default.contentsOfDirectory(atPath: $0) }
+        if let cellar = SplashPaths.firstCellarCandidate(subpath: "libexec/python/bin/python3", versions: versions) {
+            return cellar
         }
         return "/usr/bin/python3"
     }
     
     public var splashModelsScriptPath: String {
-        let candidates = [
-            "/opt/homebrew/opt/splash/libexec/install/models.py",
-            "/usr/local/opt/splash/libexec/install/models.py"
-        ]
-        for p in candidates where FileManager.default.fileExists(atPath: p) {
-            return p
+        if let stable = SplashPaths.firstExisting(SplashPaths.modelsScriptCandidates(),
+                                                  exists: { FileManager.default.fileExists(atPath: $0) }) {
+            return stable
         }
-        
-        // Wildcard search for any Cellar version
-        let fm = FileManager.default
-        let cellarRoots = ["/opt/homebrew/Cellar/splash", "/usr/local/Cellar/splash"]
-        for root in cellarRoots where fm.fileExists(atPath: root) {
-            if let versions = try? fm.contentsOfDirectory(atPath: root) {
-                for v in versions {
-                    let script = "\(root)/\(v)/libexec/install/models.py"
-                    if fm.fileExists(atPath: script) {
-                        return script
-                    }
-                }
-            }
-        }
-        return ""
+        let versions: (String) -> [String]? = { try? FileManager.default.contentsOfDirectory(atPath: $0) }
+        return SplashPaths.firstCellarCandidate(subpath: "libexec/install/models.py", versions: versions) ?? ""
     }
     
-    public init() {
+    public init(transport: StatusTransport = URLSessionStatusTransport(),
+                terminator: ServerTerminating = HardenedServerTerminator(),
+                pollInterval: TimeInterval? = nil,
+                dataDirectoryRoot: URL? = nil,
+                bootstrapNetwork: Bool = true) {
+        self.transport = transport
+        self.terminator = terminator
+        self.dataDirectoryRoot = dataDirectoryRoot
+        // El intervalo configurable por el usuario (`@AppStorage("refreshInterval")`)
+        // sigue gobernando el sondeo; las pruebas inyectan uno propio.
+        let storedInterval = UserDefaults.standard.double(forKey: "refreshInterval")
+        let baseInterval = storedInterval > 0 ? storedInterval : 1.5
+        self.pollInterval = max(0.5, pollInterval ?? baseInterval)
+        self.dataDirectory = dataDirectoryRoot ?? FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/Splash")
+
         self.activePort = lastUsedPort
         checkDependencies()
         startPolling()
         refreshInstalledModels()
-        Task {
-            await fetchOnlineModels()
-            await checkForUpdate()
-            refreshAgentAvailability()
+        cleanLegacyArtifacts()
+        // `bootstrapNetwork: false` evita tráfico real (Hugging Face, GitHub) en las
+        // pruebas y en cualquier integración que necesite un arranque hermético.
+        if bootstrapNetwork {
+            Task {
+                await fetchOnlineModels()
+                await checkForUpdate()
+                refreshAgentAvailability()
+            }
         }
     }
     
-    deinit {
-        timer?.invalidate()
+    // MARK: - Residuos de versiones anteriores (P-17 / H-14)
+
+    /// Elimina restos del *bridge launcher* que se retiró en 1.0.1 pero que sigue en
+    /// disco tras actualizar (`~/Library/Application Support/Splash/splash_launcher.py`),
+    /// y bloqueos huérfanos del motor.
+    public func cleanLegacyArtifacts() {
+        let fm = FileManager.default
+        let legacyFiles = ["splash_launcher.py"]
+        for name in legacyFiles {
+            let url = dataDirectory.appendingPathComponent(name)
+            if fm.fileExists(atPath: url.path) {
+                try? fm.removeItem(at: url)
+            }
+        }
+        cleanStaleLocks()
+    }
+
+    /// Borra bloqueos del motor cuyo PID ya no existe y que superan el margen de
+    /// arranque (P-08). No toca bloqueos vivos.
+    public func cleanStaleLocks() {
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: runtimeDirectory,
+                                                        includingPropertiesForKeys: [.contentModificationDateKey],
+                                                        options: [.skipsHiddenFiles]) else { return }
+        for url in entries where url.pathExtension == "lock" {
+            let attributes = try? fm.attributesOfItem(atPath: url.path)
+            let age = -(attributes?[.modificationDate] as? Date ?? .distantPast).timeIntervalSinceNow
+            let data = try? Data(contentsOf: url)
+            let lock = ServeLockStore.decode(data)
+            let alive = lock.map { kill(Int32($0.pid), 0) == 0 } ?? false
+            if ServeLockStore.isStale(lock, pidAlive: alive, age: age) {
+                try? fm.removeItem(at: url)
+            }
+        }
     }
     
     // MARK: - Dependency Management
     
     public func checkDependencies() {
         self.hasHomebrew = brewExecutablePath != nil
-        let directPath = splashExecutablePath
-        let isDirectExecutable = directPath != "splash" && FileManager.default.isExecutableFile(atPath: directPath)
-        
-        if isDirectExecutable {
-            self.isSplashInstalled = true
-            // Read splash --version
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: directPath)
-            proc.arguments = ["--version"]
-            let pipe = Pipe()
-            proc.standardOutput = pipe
-            do {
-                try proc.run()
-                proc.waitUntilExit()
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                if let ver = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !ver.isEmpty {
-                    self.splashVersion = ver.replacingOccurrences(of: "splash ", with: "v")
-                } else {
-                    self.splashVersion = "v1.0"
-                }
-            } catch {
-                self.splashVersion = "v1.0"
-            }
+        guard let directPath = SplashPaths.firstExisting(SplashPaths.splashExecutableCandidates()) else {
+            self.isSplashInstalled = false
+            self.splashVersion = nil
+            return
+        }
+        self.isSplashInstalled = true
+        // `splash --version` medido en 30-50 ms (motor 1.0.2, M4 Max): coste acotado.
+        let result = CommandRunner.run(directPath, ["--version"])
+        let version = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        if result.succeeded, !version.isEmpty {
+            self.splashVersion = version.replacingOccurrences(of: "Splash ", with: "v")
+                .replacingOccurrences(of: "splash ", with: "v")
         } else {
-            // Check via which
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-            proc.arguments = ["splash"]
-            let pipe = Pipe()
-            proc.standardOutput = pipe
-            do {
-                try proc.run()
-                proc.waitUntilExit()
-                self.isSplashInstalled = (proc.terminationStatus == 0)
-                self.splashVersion = self.isSplashInstalled ? "v1.0" : nil
-            } catch {
-                self.isSplashInstalled = false
-                self.splashVersion = nil
-            }
+            self.splashVersion = "v1.0"
         }
     }
     
@@ -378,7 +399,9 @@ public class SplashService: ObservableObject {
     
     public func startPolling() {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+        watchdog?.invalidate()
+        watchdog = nil
+        timer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             Task { @MainActor in
                 await self.checkServerStatus()
@@ -389,81 +412,106 @@ public class SplashService: ObservableObject {
             await self.checkServerStatus()
         }
     }
+
+    /// `true` mientras el sondeo periódico está vivo (P-02). Expuesto para las pruebas.
+    public var isPollingActive: Bool {
+        timer?.isValid ?? false
+    }
+    
+    /// `true` mientras el vigía de recuperación está armado. Expuesto para las pruebas.
+    public var isWatchdogActive: Bool {
+        watchdog?.isValid ?? false
+    }
+
+    /// Vigía de recuperación (P-02).
+    ///
+    /// Defecto corregido: `stopServerAsync()` invalidaba el temporizador y **ninguna ruta
+    /// lo recreaba**, de modo que tras pulsar «Detener Servidor» una vez el panel dejaba
+    /// de actualizarse durante el resto de la sesión, y un motor arrancado desde la
+    /// terminal nunca se detectaba. Ahora, con el servidor detenido, un vigía lento
+    /// comprueba el estado y reconstruye el sondeo en cuanto aparece un motor vivo.
+    private func ensureWatchdog() {
+        guard watchdog == nil else { return }
+        watchdog = Timer.scheduledTimer(withTimeInterval: watchdogInterval, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                await self.watchdogTick()
+            }
+        }
+    }
+    
+    /// Un ciclo del vigía: comprueba el estado y reconstruye el sondeo si hay motor.
+    /// Expuesto para poder probarlo sin depender del reloj.
+    public func watchdogTick() async {
+        await checkServerStatus()
+        if isRunning { restorePollingAfterDetection() }
+    }
+
+    /// Reconstruye el sondeo periódico y apaga el vigía.
+    public func restorePollingAfterDetection() {
+        watchdog?.invalidate()
+        watchdog = nil
+        if !isPollingActive { startPolling() }
+    }
     
     public func checkServerStatus() async {
-        // 1. Read serve.lock if present
+        // 1. Resolver el bloqueo del motor (serve-<puerto>.lock y compatibilidad con serve.lock)
         var lockPid: Int? = nil
         var lockPort: Int = self.activePort
         var lockModel: String? = nil
         
-        if FileManager.default.fileExists(atPath: lockFileURL.path) {
-            do {
-                let data = try Data(contentsOf: lockFileURL)
-                if let lock = try? JSONDecoder().decode(ServeLock.self, from: data) {
-                    lockPid = lock.pid
-                    lockPort = lock.port
-                    lockModel = lock.model
-                }
-            } catch {
-                // Ignore lock file read race
+        for url in lockCandidateURLs() {
+            guard let data = try? Data(contentsOf: url),
+                  let lock = ServeLockStore.decode(data), lock.pid > 0 else { continue }
+            let alive = kill(Int32(lock.pid), 0) == 0
+            if alive {
+                lockPid = lock.pid
+                lockPort = lock.port
+                lockModel = lock.model
+                break
+            }
+            // PID muerto: se limpia solo si ya pasó el margen de arranque (P-08).
+            let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+            let age = -(attributes?[.modificationDate] as? Date ?? .distantPast).timeIntervalSinceNow
+            if ServeLockStore.isStale(lock, pidAlive: false, age: age) {
+                try? FileManager.default.removeItem(at: url)
             }
         }
         
-        // Check if process is alive if we have a PID
-        if let pid = lockPid {
-            let isAlive = kill(pid_t(pid), 0) == 0
-            if !isAlive {
-                lockPid = nil
-                // Stale lock file cleanup
-                try? FileManager.default.removeItem(at: lockFileURL)
+        if lockPid != nil {
+            self.activePort = lockPort
+            if let model = lockModel {
+                self.activeModel = model
             }
-        }
-        
-        self.activePort = lockPort
-        if let model = lockModel {
-            self.activeModel = model
         }
         self.activePid = lockPid
         
-        // 2. Query /status endpoint
-        let endpoint = "http://127.0.0.1:\(activePort)/status"
-        guard let url = URL(string: endpoint) else { return }
-        
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 1.0
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200 {
-                let decoded = try JSONDecoder().decode(SplashStatus.self, from: data)
-                self.status = decoded
-                self.isRunning = decoded.ready ?? true
-                if let instanceModel = decoded.instance?.model {
-                    self.activeModel = instanceModel
-                }
-                if let pid = decoded.instance?.pid {
-                    self.activePid = pid
-                }
-                
-                // Track decode speed for chart
-                let currentSpeed = decoded.metrics?.decodeTokensPerSecond ?? 0.0
-                self.speedHistory.append(currentSpeed)
-                if self.speedHistory.count > 30 {
-                    self.speedHistory.removeFirst()
-                }
-                self.lastError = nil
-                
-                // Sync shell env if port changed (e.g. after brew upgrade)
-                if self.activePort != self.lastUsedPort {
-                    self.lastUsedPort = self.activePort
-                    self.syncShellEnvironment(port: self.activePort)
-                }
-            } else {
-                self.isRunning = false
-                self.status = nil
+        // 2. Consultar /status a través del transporte inyectable
+        if let decoded = await transport.fetchStatus(port: activePort, timeout: 1.0) {
+            self.status = decoded
+            self.isRunning = decoded.ready ?? true
+            if let instanceModel = decoded.instance?.model {
+                self.activeModel = instanceModel
             }
-        } catch {
-            // Fallback: scan flexible de puertos si el lock file no existe
+            if let pid = decoded.instance?.pid {
+                self.activePid = pid
+            }
+            
+            // Track decode speed for chart
+            let currentSpeed = decoded.metrics?.decodeTokensPerSecond ?? 0.0
+            self.speedHistory.append(currentSpeed)
+            if self.speedHistory.count > 30 {
+                self.speedHistory.removeFirst()
+            }
+            self.lastError = nil
+            
+            // Sync shell env if port changed (e.g. after brew upgrade)
+            if self.activePort != self.lastUsedPort {
+                self.lastUsedPort = self.activePort
+                self.syncShellEnvironment(port: self.activePort)
+            }
+        } else {
+            // Fallback: scan flexible de puertos si no hay bloqueo vivo
             if lockPid == nil {
                 await scanAndConnectPort()
             } else {
@@ -475,8 +523,31 @@ public class SplashService: ObservableObject {
         // Scan active connected apps/clients
         await scanConnectedClients()
         
-        // Update active flag on installed models list
-        refreshInstalledModels()
+        // 3. Reescaneo del catálogo local: como mucho una vez cada 10 ciclos (P-12).
+        //    El tamaño en disco no cambia entre ciclos y resolver 215 ficheros con
+        //    symlinks costaba 7,5 ms de E/S síncrona sobre el @MainActor cada 1,5 s.
+        ticksSinceModelRefresh += 1
+        if ticksSinceModelRefresh >= 10 || installedModels.isEmpty {
+            ticksSinceModelRefresh = 0
+            refreshInstalledModels()
+        }
+    }
+    
+    /// Ficheros de bloqueo a considerar, priorizando el del puerto activo.
+    public func lockCandidateURLs() -> [URL] {
+        let fm = FileManager.default
+        var urls = lockFileURLs(port: activePort)
+        if let entries = try? fm.contentsOfDirectory(at: runtimeDirectory,
+                                                     includingPropertiesForKeys: nil,
+                                                     options: [.skipsHiddenFiles]) {
+            let discovered = entries
+                .filter { $0.lastPathComponent.hasPrefix("serve") && $0.pathExtension == "lock" }
+                .sorted { $0.lastPathComponent > $1.lastPathComponent }
+            for url in discovered where !urls.contains(url) {
+                urls.append(url)
+            }
+        }
+        return urls
     }
     
     private func scanAndConnectPort() async {
@@ -485,25 +556,19 @@ public class SplashService: ObservableObject {
         let uniquePorts = portsToTry.filter { seen.insert($0).inserted }
         
         for port in uniquePorts {
-            guard let url = URL(string: "http://127.0.0.1:\(port)/status") else { continue }
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 0.8
-            if let (data, response) = try? await URLSession.shared.data(for: request),
-               let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200,
-               let decoded = try? JSONDecoder().decode(SplashStatus.self, from: data) {
-                self.activePort = port
-                self.lastUsedPort = port
-                self.syncShellEnvironment(port: port)
-                self.status = decoded
-                self.isRunning = decoded.ready ?? true
-                if let instanceModel = decoded.instance?.model {
-                    self.activeModel = instanceModel
-                }
-                if let pid = decoded.instance?.pid {
-                    self.activePid = pid
-                }
-                return
+            guard let decoded = await transport.fetchStatus(port: port, timeout: 0.8) else { continue }
+            self.activePort = port
+            self.lastUsedPort = port
+            self.syncShellEnvironment(port: port)
+            self.status = decoded
+            self.isRunning = decoded.ready ?? true
+            if let instanceModel = decoded.instance?.model {
+                self.activeModel = instanceModel
             }
+            if let pid = decoded.instance?.pid {
+                self.activePid = pid
+            }
+            return
         }
     }
     
@@ -528,8 +593,14 @@ public class SplashService: ObservableObject {
                     let repoId = "\(owner)/\(modelName)"
                     let isActive = (repoId == self.activeModel && self.isRunning)
                     
-                    // Calculate real size resolving symlinks
-                    let size = calculateDirectorySize(url: modelURL)
+                    // Tamaño real resolviendo symlinks, con caché por modelo (P-12).
+                    // La clave incluye la fecha de modificación del enlace: al reinstalar
+                    // o actualizar un modelo el valor se recalcula solo.
+                    let stamp = (try? modelURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+                        .contentModificationDate
+                    let size = sizeCache.size(repoId: repoId, stamp: stamp) {
+                        Self.directorySize(url: modelURL)
+                    }
                     
                     results.append(InstalledSplashModel(
                         repoId: repoId,
@@ -552,7 +623,9 @@ public class SplashService: ObservableObject {
         }
     }
     
-    private func calculateDirectorySize(url: URL) -> Int64 {
+    /// Suma el tamaño real de un árbol resolviendo enlaces simbólicos.
+    /// `nonisolated` para poder invocarse desde trabajo en segundo plano.
+    nonisolated public static func directorySize(url: URL) -> Int64 {
         let fm = FileManager.default
         var total: Int64 = 0
         let resolvedRoot = url.resolvingSymlinksInPath()
@@ -571,6 +644,12 @@ public class SplashService: ObservableObject {
     }
     
     public func deleteModel(repoId: String) {
+        // El identificador llega de la interfaz y se usa como ruta: sin validar,
+        // un valor como `../../..` borraba fuera del directorio de modelos.
+        guard ModelIDValidator.isValid(repoId) else {
+            self.lastError = "Identificador de modelo no válido: \(repoId)"
+            return
+        }
         let symlinkURL = modelsDirectory.appendingPathComponent(repoId)
         let fm = FileManager.default
         do {
@@ -580,6 +659,7 @@ public class SplashService: ObservableObject {
             if fm.fileExists(atPath: symlinkURL.path) {
                 try fm.removeItem(at: symlinkURL)
             }
+            sizeCache.invalidate(repoId: repoId)
             refreshInstalledModels()
         } catch {
             print("Error deleting model symlink \(repoId): \(error)")
@@ -613,13 +693,16 @@ public class SplashService: ObservableObject {
         // Extract version number: "v1.0.2-beta" → "1.0.2-beta"
         let latest = tagName.hasPrefix("v") ? String(tagName.dropFirst()) : tagName
         
-        // Simple version comparison (lexicographic works for semver-like strings)
-        if latest > currentVersion {
+        // Comparación semántica (P-07). El código anterior usaba `String >`
+        // (lexicográfico), que consideraba `1.0.10-beta` anterior a `1.0.2-beta` y
+        // dejaba de anunciar actualizaciones a partir de la décima revisión.
+        if SemanticVersion.isNewer(latest, than: currentVersion) {
             self.hasUpdate = true
             self.latestVersion = tagName
             self.latestReleaseURL = json["html_url"] as? String ?? "https://github.com/\(githubRepo)/releases/latest"
         } else {
             self.hasUpdate = false
+            self.latestVersion = tagName
         }
     }
     
@@ -665,6 +748,10 @@ public class SplashService: ObservableObject {
     
     public func installModel(repoId: String) {
         guard !isInstalling else { return }
+        guard ModelIDValidator.isValid(repoId) else {
+            self.lastError = ModelIDValidator.rejectionReason(repoId) ?? "Identificador de modelo no válido."
+            return
+        }
         isInstalling = true
         installingModelId = repoId
         installLogs = ["Iniciando descarga y preparación para \(repoId)..."]
@@ -748,12 +835,16 @@ public class SplashService: ObservableObject {
     // MARK: - Server Control
     
     public func stopServerAsync() async {
-        await killSplashProcesses(port: activePort)
+        await terminator.stopEngine(port: activePort, candidatePids: candidateStopPIDs())
         self.isRunning = false
         self.status = nil
         self.activePid = nil
         self.speedHistory.removeAll()
         timer?.invalidate()
+        // P-02: el sondeo no puede quedar muerto. Se deja un vigía lento que detecta
+        // cualquier motor que arranque después (desde la app, la terminal o un agente).
+        ensureWatchdog()
+        cleanStaleLocks()
     }
     
     public func stopServer() {
@@ -762,21 +853,15 @@ public class SplashService: ObservableObject {
         }
     }
     
-    /// Synchronous stop for applicationWillTerminate — no async, no Task
+    /// Detención síncrona para `applicationWillTerminate` (sin async, sin Task).
+    /// Solo señaliza procesos verificados como motor (P-01): antes ejecutaba
+    /// `pkill -INT -f "splash serve"`, que alcanza cualquier proceso cuya línea de
+    /// comandos contenga esa cadena, y después aplicaba `SIGKILL` a todo lo que
+    /// `lsof -ti :<puerto>` devolviese, incluidos los clientes conectados.
     public func stopServerSync() {
-        // Kill splash processes via pkill (synchronous)
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        proc.arguments = ["-INT", "-f", "splash serve"]
-        try? proc.run()
-        proc.waitUntilExit()
-        
-        // Also kill on active port
-        killProcessesOnPort(port: activePort)
-        
-        // Clean lock file
-        if FileManager.default.fileExists(atPath: lockFileURL.path) {
-            try? FileManager.default.removeItem(at: lockFileURL)
+        terminator.stopEngineSynchronously(port: activePort, candidatePids: candidateStopPIDs())
+        for url in lockFileURLs(port: activePort) where FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.removeItem(at: url)
         }
     }
     
@@ -803,75 +888,37 @@ public class SplashService: ObservableObject {
         dependencyInstallSuccess = nil
         portConflict = nil
         timer?.invalidate()
+        watchdog?.invalidate()
+        watchdog = nil
+        sizeCache.invalidateAll()
+        ticksSinceModelRefresh = 0
     }
     
+    /// Detiene el motor del puerto indicado. Delega en el terminador endurecido:
+    /// solo escuchas verificadas del motor y escalada INT → TERM → KILL.
     public func killSplashProcesses(port: Int) async {
-        // 1. Send SIGINT to activePid or PID in serve.lock for graceful exit
-        var targetPids: Set<Int32> = []
-        if let p = activePid, p > 0 { targetPids.insert(Int32(p)) }
-        if let lockPid = readLockPid(), lockPid > 0 { targetPids.insert(Int32(lockPid)) }
-        
-        for p in targetPids {
-            kill(p, SIGINT)
-        }
-        
-        // 2. Also send SIGINT to python server.py and native engine
-        runPkill(pattern: "server.py", signal: "-INT")
-        runPkill(pattern: "libexec/engine/splash", signal: "-INT")
-        runPkill(pattern: "splash serve", signal: "-INT")
-        
-        // 3. Wait up to 3 seconds for port to become free
-        for _ in 0..<30 {
-            if !isPortListening(port: port) { break }
-            try? await Task.sleep(nanoseconds: 100_000_000)
-        }
-        
-        // 4. Force kill if still lingering
-        if isPortListening(port: port) {
-            runPkill(pattern: "server.py", signal: "-9")
-            runPkill(pattern: "libexec/engine/splash", signal: "-9")
-            killProcessesOnPort(port: port)
-            try? await Task.sleep(nanoseconds: 200_000_000)
-        }
-        
-        // 5. Clean lock file
-        if FileManager.default.fileExists(atPath: lockFileURL.path) {
-            try? FileManager.default.removeItem(at: lockFileURL)
-        }
+        await terminator.stopEngine(port: port, candidatePids: candidateStopPIDs())
     }
     
-    private func runPkill(pattern: String, signal: String) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        proc.arguments = [signal, "-f", pattern]
-        try? proc.run()
-        proc.waitUntilExit()
+    /// PIDs candidatos a detener: el proceso activo y los declarados por bloqueos vivos.
+    /// Nunca se amplía con «todo lo que escuche en el puerto».
+    public func candidateStopPIDs() -> [Int32] {
+        var pids: [Int32] = []
+        if let pid = activePid, pid > 0 { pids.append(Int32(pid)) }
+        for url in lockCandidateURLs() {
+            guard let lock = ServeLockStore.decode(try? Data(contentsOf: url)), lock.pid > 0 else { continue }
+            pids.append(Int32(lock.pid))
+        }
+        return pids
     }
     
-    private func readLockPid() -> Int? {
-        guard FileManager.default.fileExists(atPath: lockFileURL.path),
-              let data = try? Data(contentsOf: lockFileURL),
-              let lock = try? JSONDecoder().decode(ServeLock.self, from: data) else {
-            return nil
+    /// PID declarado por el bloqueo vivo del motor, si existe (P-08).
+    public func readLockPid() -> Int? {
+        for url in lockCandidateURLs() {
+            guard let lock = ServeLockStore.decode(try? Data(contentsOf: url)), lock.pid > 0 else { continue }
+            if kill(Int32(lock.pid), 0) == 0 { return lock.pid }
         }
-        return lock.pid
-    }
-    
-    private func killProcessesOnPort(port: Int) {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-        proc.arguments = ["-ti", ":\(port)"]
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        try? proc.run()
-        proc.waitUntilExit()
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        if let output = String(data: data, encoding: .utf8) {
-            let pids = output.components(separatedBy: .whitespacesAndNewlines).compactMap { Int32($0) }
-            for p in pids where p > 0 {
-                kill(p, SIGKILL)
-            }
-        }
+        return nil
     }
     
     public func isPortListening(port: Int) -> Bool {
@@ -970,8 +1017,18 @@ public class SplashService: ObservableObject {
         let targetPort = conflict.port
         self.portConflict = nil
         if killProcess {
-            kill(conflict.pid, SIGKILL)
-            usleep(250_000)
+            // Reverificación de identidad antes de señalizar: entre la detección y la
+            // confirmación del usuario el PID puede haberse reciclado por otro proceso
+            // (incluido el propio motor). `SIGTERM` primero; `SIGKILL` solo si persiste.
+            let comm = CommandRunner.run("/bin/ps", ["-p", "\(conflict.pid)", "-o", "comm="])
+                .output.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !SplashEngineIdentity.isEngineCommand(comm) {
+                kill(conflict.pid, SIGTERM)
+                usleep(250_000)
+                if kill(conflict.pid, 0) == 0 {
+                    kill(conflict.pid, SIGKILL)
+                }
+            }
             startServer(model: selectedModelForLaunch, port: targetPort)
         } else {
             self.isStartingServer = false
@@ -991,12 +1048,28 @@ public class SplashService: ObservableObject {
             return
         }
         
+        // P-03: el identificador de modelo se interpola dentro de un script de shell.
+        // Sin validación, un valor con comillas cerraba el entrecomillado y ejecutaba
+        // comandos arbitrarios (verificado en la auditoría con un fichero testigo).
+        guard let validatedModel = ModelIDValidator.normalized(model) else {
+            self.lastError = ModelIDValidator.rejectionReason(model) ?? "Identificador de modelo no válido."
+            self.isStartingServer = false
+            self.startingModelId = nil
+            return
+        }
+        guard (1...65535).contains(port) else {
+            self.lastError = "Puerto fuera de rango: \(port)"
+            self.isStartingServer = false
+            self.startingModelId = nil
+            return
+        }
+        
         self.activePort = port
         self.lastUsedPort = port
         self.selectedModelForLaunch = model
         
         // 1. Pre-flight check for port conflict with third-party software
-        if let conflict = detectPortConflict(port: port) {
+        if !skipPortConflictCheck, let conflict = detectPortConflict(port: port) {
             self.portConflict = conflict
             self.isStartingServer = false
             self.startingModelId = nil
@@ -1004,27 +1077,25 @@ public class SplashService: ObservableObject {
         }
         
         self.isStartingServer = true
-        self.startingModelId = model
+        self.startingModelId = validatedModel
         
         Task {
-            // Clean up any stale lock file if the process died
-            if let lockPid = self.readLockPid() {
-                if kill(Int32(lockPid), 0) != 0 {
-                    try? FileManager.default.removeItem(at: self.lockFileURL)
-                }
-            }
+            // Limpieza de bloqueos muertos antes de arrancar (P-08).
+            self.cleanStaleLocks()
             
             // Ensure any existing splash process on this port is cleared
             await killSplashProcesses(port: port)
             
             let splashPath = self.splashExecutablePath
-            // SIEMPRE usar --port nativo (Splash lo soporta desde v1.0)
-            let runCmd = "\"\(splashPath)\" serve --model \"\(model)\" --port \"\(port)\""
+            let modelAliases = ["claude-haiku-4-5", "claude-3-5-sonnet-latest", "claude-sonnet-4-5"]
+            let aliasFlags = modelAliases.map { "--served-model-name \"\($0)\"" }.joined(separator: " ")
+            // SIEMPRE usar --port nativo (Splash lo soporta desde v1.0) con alias de modelos para Claude Desktop / Cowork
+            let runCmd = "\"\(splashPath)\" serve --model \"\(validatedModel)\" --port \"\(port)\" \(aliasFlags)"
             
             let cmd = """
             echo "🌊 ==============================================="
             echo "🚀 Iniciando Servidor Splash..."
-            echo "📦 Modelo: \(model)"
+            echo "📦 Modelo: \(validatedModel)"
             echo "🔌 Puerto: \(port)"
             echo "⚡️ Motor:  \(splashPath)"
             echo "==============================================="
@@ -1040,7 +1111,10 @@ public class SplashService: ObservableObject {
             fi
             """
             
-            if self.runInBackground {
+            if let override = self.serverLaunchOverride {
+                let logURL = self.runInBackground ? self.serverLogURL : nil
+                override(cmd, logURL, self.runInBackground)
+            } else if self.runInBackground {
                 let logsDir = self.dataDirectory.appendingPathComponent("logs")
                 try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
                 let logFileURL = self.serverLogURL
@@ -1061,7 +1135,7 @@ public class SplashService: ObservableObject {
             } else {
                 self.runInTerminal(
                     command: cmd,
-                    title: "Splash Server - \(model)",
+                    title: "Splash Server - \(validatedModel)",
                     scriptFileName: "start_splash.command"
                 )
             }
@@ -1073,13 +1147,16 @@ public class SplashService: ObservableObject {
                 if self.isRunning { break }
             }
             
-            // Sync shell environment so terminal commands use the correct port
+            // P-13: política única de entorno — se sincroniza SIEMPRE, también en 8000,
+            // porque los agentes de terminal necesitan SPLASH_PORT/ANTHROPIC_BASE_URL.
+            // Antes esta ruta borraba el entorno en 8000 mientras checkServerStatus() lo
+            // escribía para el mismo puerto: dos reglas opuestas.
             if self.isRunning {
-                if port != 8000 {
-                    self.syncShellEnvironment(port: port)
-                } else {
-                    self.clearShellEnvironment()
-                }
+                self.syncShellEnvironment(port: port)
+                self.restorePollingAfterDetection()
+            } else {
+                // El motor no confirmó: mantener la app sensible a un arranque tardío (P-02).
+                self.ensureWatchdog()
             }
             
             self.isStartingServer = false
@@ -1095,36 +1172,94 @@ public class SplashService: ObservableObject {
     
     // MARK: - Shell Environment Sync
     
-    /// Write SPLASH_PORT env vars to ~/.splash_monitor_env so terminal commands
-    /// (splash claude, splash codex, etc.) connect to the correct port.
-    public func syncShellEnvironment(port: Int) {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let envFile = home.appendingPathComponent(".splash_monitor_env")
-        let envContent = """
-        # Splash Monitor — auto-generated environment (do not edit manually)
-        # Generated by Splash Monitor for port \(port)
-        export SPLASH_PORT="\(port)"
-        export ANTHROPIC_BASE_URL="http://127.0.0.1:\(port)"
-        export OPENAI_BASE_URL="http://127.0.0.1:\(port)/v1"
-        """
-        
-        try? envContent.write(to: envFile, atomically: true, encoding: .utf8)
-        
-        // Inject source line into .zshrc if not already present
-        let zshrc = home.appendingPathComponent(".zshrc")
-        if let zshrcContent = try? String(contentsOf: zshrc, encoding: .utf8) {
-            let sourceLine = "[ -f \"\(envFile.path)\" ] && source \"\(envFile.path)\""
-            if !zshrcContent.contains("splash_monitor_env") {
-                let injection = "\n\n# Splash Monitor — port environment\n\(sourceLine)\n"
-                try? (zshrcContent + injection).write(to: zshrc, atomically: true, encoding: .utf8)
-            }
+    /// Escribe `SPLASH_PORT` y las URL base del motor en `~/.splash_monitor_env` y añade
+    /// el `source` a `~/.zshrc`.
+    ///
+    /// P-09: escribir fuera del directorio de datos exige consentimiento explícito.
+    /// Antes la app modificaba `~/.zshrc` sin avisar y solo se podía deshacer a mano.
+    /// P-13: política única — el entorno se sincroniza siempre (también en 8000).
+    @Published public var pendingShellConfigPort: Int?
+    
+    /// Consentimiento para modificar `~/.zshrc`, persistido entre sesiones.
+    public var shellConfigConsent: Bool {
+        get { UserDefaults.standard.bool(forKey: "shellConfigConsent") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "shellConfigConsent")
+            objectWillChange.send()
         }
     }
     
-    /// Remove shell environment file when server goes back to default port
+    /// El usuario rechazó la escritura: no se vuelve a preguntar.
+    public var shellConfigDeclined: Bool {
+        get { UserDefaults.standard.bool(forKey: "shellConfigDeclined") }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "shellConfigDeclined")
+            objectWillChange.send()
+        }
+    }
+    
+    public func syncShellEnvironment(port: Int) {
+        guard ShellEnvironment.shouldSync(port: port) else { return }
+        let home = shellEnvironmentDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+        let envFile = home.appendingPathComponent(ShellEnvironment.fileName)
+        try? ShellEnvironment.fileContents(port: port).write(to: envFile, atomically: true, encoding: .utf8)
+        
+        switch ShellConsent.decide(hasConsent: shellConfigConsent, userDeclined: shellConfigDeclined) {
+        case .write:
+            injectShellSource(envFile: envFile)
+        case .askUser:
+            // La interfaz muestra el aviso; el fichero de entorno ya está escrito.
+            if pendingShellConfigPort != port { pendingShellConfigPort = port }
+        case .skip:
+            break
+        }
+    }
+    
+    /// Añade la línea `source` a `~/.zshrc` si no está ya (idempotente).
+    public func injectShellSource(envFile: URL) {
+        let home = shellEnvironmentDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+        let zshrc = home.appendingPathComponent(".zshrc")
+        let contents = (try? String(contentsOf: zshrc, encoding: .utf8)) ?? ""
+        guard ShellEnvironment.needsInjection(into: contents) else { return }
+        let updated = contents + ShellEnvironment.injectionBlock(envFilePath: envFile.path)
+        if let override = shellWriteOverride {
+            override(updated, zshrc)
+        } else {
+            try? updated.write(to: zshrc, atomically: true, encoding: .utf8)
+        }
+    }
+    
+    /// Respuesta del usuario al aviso de configuración del shell (P-09).
+    public func resolveShellConfigPrompt(allow: Bool) {
+        shellConfigConsent = allow
+        shellConfigDeclined = !allow
+        guard allow, let port = pendingShellConfigPort else {
+            pendingShellConfigPort = nil
+            return
+        }
+        pendingShellConfigPort = nil
+        let envFile = (shellEnvironmentDirectory ?? FileManager.default.homeDirectoryForCurrentUser)
+            .appendingPathComponent(ShellEnvironment.fileName)
+        try? ShellEnvironment.fileContents(port: port).write(to: envFile, atomically: true, encoding: .utf8)
+        injectShellSource(envFile: envFile)
+    }
+    
+    /// Revierte por completo el efecto de `syncShellEnvironment`: quita la inyección de
+    /// `~/.zshrc` (reversión exacta, no heurística) y borra el fichero de entorno.
     public func clearShellEnvironment() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let envFile = home.appendingPathComponent(".splash_monitor_env")
+        let home = shellEnvironmentDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+        let envFile = home.appendingPathComponent(ShellEnvironment.fileName)
+        let zshrc = home.appendingPathComponent(".zshrc")
+        if let contents = try? String(contentsOf: zshrc, encoding: .utf8) {
+            let cleaned = ShellEnvironment.removingInjection(from: contents)
+            if cleaned != contents {
+                if let override = shellWriteOverride {
+                    override(cleaned, zshrc)
+                } else {
+                    try? cleaned.write(to: zshrc, atomically: true, encoding: .utf8)
+                }
+            }
+        }
         try? FileManager.default.removeItem(at: envFile)
     }
     
@@ -1132,6 +1267,12 @@ public class SplashService: ObservableObject {
     
     /// Fast check using filesystem only — no Process, no blocking
     public func isAgentInstalled(agent: String) -> Bool {
+        if agent == "claude-cowork" {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            return installedAgents.contains("claude-cowork")
+                || FileManager.default.fileExists(atPath: "/Applications/Claude.app")
+                || FileManager.default.fileExists(atPath: "\(home)/Applications/Claude.app")
+        }
         return installedAgents.contains(agent)
     }
     
@@ -1155,6 +1296,11 @@ public class SplashService: ObservableObject {
                     found.insert(agent)
                 }
             }
+            // Detección de Claude Desktop / Cowork en macOS
+            if FileManager.default.fileExists(atPath: "/Applications/Claude.app") ||
+               FileManager.default.fileExists(atPath: "\(home)/Applications/Claude.app") {
+                found.insert("claude-cowork")
+            }
             let result = found
             await MainActor.run {
                 self.installedAgents = result
@@ -1166,6 +1312,8 @@ public class SplashService: ObservableObject {
         switch agent {
         case "claude":
             return URL(string: "https://code.claude.com/docs/en/overview")!
+        case "claude-cowork":
+            return URL(string: "https://claude.ai/download")!
         case "opencode":
             return URL(string: "https://opencode.ai/docs/")!
         case "codex":
@@ -1177,9 +1325,41 @@ public class SplashService: ObservableObject {
         }
     }
     
+    /// Agentes que el motor sabe lanzar (`splash <agente>` o app nativa para cowork).
+    public static let supportedAgents = ["claude", "claude-cowork", "opencode", "codex", "hermes"]
+    
     public func launchAgent(agent: String) {
         guard isSplashInstalled else {
             installSplashDependency()
+            return
+        }
+        // El nombre del agente se restringe a la lista soportada por el motor.
+        guard Self.supportedAgents.contains(agent) else {
+            self.lastError = "Agente no soportado: \(agent)"
+            return
+        }
+        
+        // Manejo específico para Claude Desktop / Cowork (App GUI macOS)
+        if agent == "claude-cowork" {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let appURL = [
+                URL(fileURLWithPath: "/Applications/Claude.app"),
+                URL(fileURLWithPath: "\(home)/Applications/Claude.app")
+            ].first(where: { FileManager.default.fileExists(atPath: $0.path) })
+            
+            if let targetURL = appURL {
+                let config = NSWorkspace.OpenConfiguration()
+                config.activates = true
+                NSWorkspace.shared.openApplication(at: targetURL, configuration: config) { _, error in
+                    if let error = error {
+                        Task { @MainActor in
+                            self.lastError = "Error al abrir Claude Cowork: \(error.localizedDescription)"
+                        }
+                    }
+                }
+            } else {
+                _ = CommandRunner.run("/usr/bin/open", ["-a", "Claude"])
+            }
             return
         }
         
@@ -1288,92 +1468,81 @@ public class SplashService: ObservableObject {
         let port = self.activePort
         let serverPid = self.activePid
         
-        let detected = await Task.detached(priority: .utility) { () -> [ConnectedApp] in
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
-            proc.arguments = ["-iTCP:\(port)", "-sTCP:ESTABLISHED", "-n", "-P"]
-            let pipe = Pipe()
-            proc.standardOutput = pipe
-            
-            do {
-                try proc.run()
-                proc.waitUntilExit()
-            } catch {
-                return []
-            }
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return [] }
-            
-            var pidConnections: [Int32: (name: String, count: Int, remote: String)] = [:]
-            let lines = output.components(separatedBy: .newlines)
-            
-            for line in lines {
-                let parts = line.split(separator: " ", omittingEmptySubsequences: true)
-                guard parts.count >= 9 else { continue }
-                guard let pid = Int32(parts[1]), pid > 0 else { continue }
-                
-                // Skip server process itself
-                if let sPid = serverPid, Int32(sPid) == pid { continue }
-                
-                let comm = String(parts[0])
-                let namePart = String(parts[8])
-                
-                // Filter out Splash's internal engine or python if under a different PID
-                if comm.localizedCaseInsensitiveContains("splash") && !comm.localizedCaseInsensitiveContains("claude") {
-                    continue
-                }
-                
-                if let existing = pidConnections[pid] {
-                    pidConnections[pid] = (name: existing.name, count: existing.count + 1, remote: existing.remote)
-                } else {
-                    pidConnections[pid] = (name: comm, count: 1, remote: namePart)
-                }
-            }
-            
-            var apps: [ConnectedApp] = []
-            
-            for (pid, info) in pidConnections {
-                let runningApp = NSRunningApplication(processIdentifier: pid)
-                let appName = runningApp?.localizedName ?? info.name
-                let bundleId = runningApp?.bundleIdentifier
-                let icon = runningApp?.icon
-                let execPath = runningApp?.executableURL?.path
-                
-                let lowerName = appName.lowercased()
-                let lowerComm = info.name.lowercased()
-                let category: AppCategory
-                
-                if lowerName.contains("cursor") || lowerName.contains("code") || lowerName.contains("xcode") || lowerName.contains("zed") || lowerName.contains("studio") || lowerName.contains("intellij") || lowerName.contains("pycharm") {
-                    category = .ide
-                } else if lowerComm.contains("claude") || lowerComm.contains("opencode") || lowerComm.contains("hermes") || lowerComm.contains("codex") || lowerComm.contains("aider") {
-                    category = .codingAgent
-                } else if lowerName.contains("chat") || lowerName.contains("webui") || lowerName.contains("lmstudio") || lowerName.contains("ollama") || lowerName.contains("nextchat") {
-                    category = .chatbot
-                } else if lowerName.contains("terminal") || lowerName.contains("iterm") || lowerName.contains("warp") || lowerName.contains("kitty") || lowerName.contains("alacritty") {
-                    category = .terminal
-                } else {
-                    category = .customScript
-                }
-                
-                let app = ConnectedApp(
-                    pid: pid,
-                    name: appName,
-                    bundleId: bundleId,
-                    executablePath: execPath,
-                    category: category,
-                    icon: icon,
-                    connectionCount: info.count,
-                    status: .active,
-                    firstConnected: Date(),
-                    lastSeen: Date(),
-                    remoteAddress: info.remote
-                )
-                apps.append(app)
-            }
-            
-            return apps
+        // Solo la inspección de sockets sale del actor principal y devuelve texto
+        // (`String` es Sendable). La consulta a AppKit (`NSRunningApplication`) se hace
+        // después, ya en el actor principal: Swift 6 exige Sendable para cruzar actores y
+        // las API de AppKit no deben usarse desde hilos en segundo plano.
+        let listing = await Task.detached(priority: .utility) {
+            CommandRunner.run("/usr/sbin/lsof",
+                              ["-iTCP:\(port)", "-sTCP:ESTABLISHED", "-n", "-P"]).output
         }.value
+        
+        var pidConnections: [Int32: (name: String, count: Int, remote: String)] = [:]
+        
+        // Parser puro y comprobado (`ListerOutput`) en lugar del bucle en línea.
+        for connection in ListerOutput.establishedConnections(listing) {
+            let pid = connection.pid
+            
+            // Skip server process itself
+            if let sPid = serverPid, Int32(sPid) == pid { continue }
+            
+            let comm = connection.command
+            
+            // Filter out Splash's internal engine or python if under a different PID
+            if comm.localizedCaseInsensitiveContains("splash") && !comm.localizedCaseInsensitiveContains("claude") {
+                continue
+            }
+            
+            if let existing = pidConnections[pid] {
+                pidConnections[pid] = (name: existing.name, count: existing.count + 1, remote: existing.remote)
+            } else {
+                pidConnections[pid] = (name: comm, count: 1, remote: connection.remoteAddress)
+            }
+        }
+        
+        var detected: [ConnectedApp] = []
+        
+        for (pid, info) in pidConnections {
+            let runningApp = NSRunningApplication(processIdentifier: pid)
+            var appName = runningApp?.localizedName ?? info.name
+            let bundleId = runningApp?.bundleIdentifier
+            let icon = runningApp?.icon
+            let execPath = runningApp?.executableURL?.path
+            
+            let lowerName = appName.lowercased()
+            let lowerComm = info.name.lowercased()
+            let category: AppCategory
+            
+            if bundleId == "com.anthropic.claudefordesktop" || (lowerName == "claude" && execPath?.contains("Claude.app") == true) {
+                appName = "Claude Desktop / Cowork"
+                category = .codingAgent
+            } else if lowerName.contains("cursor") || lowerName.contains("code") || lowerName.contains("xcode") || lowerName.contains("zed") || lowerName.contains("studio") || lowerName.contains("intellij") || lowerName.contains("pycharm") {
+                category = .ide
+            } else if lowerComm.contains("claude") || lowerComm.contains("opencode") || lowerComm.contains("hermes") || lowerComm.contains("codex") || lowerComm.contains("aider") {
+                category = .codingAgent
+            } else if lowerName.contains("chat") || lowerName.contains("webui") || lowerName.contains("lmstudio") || lowerName.contains("ollama") || lowerName.contains("nextchat") {
+                category = .chatbot
+            } else if lowerName.contains("terminal") || lowerName.contains("iterm") || lowerName.contains("warp") || lowerName.contains("kitty") || lowerName.contains("alacritty") {
+                category = .terminal
+            } else {
+                category = .customScript
+            }
+            
+            let app = ConnectedApp(
+                pid: pid,
+                name: appName,
+                bundleId: bundleId,
+                executablePath: execPath,
+                category: category,
+                icon: icon,
+                connectionCount: info.count,
+                status: .active,
+                firstConnected: Date(),
+                lastSeen: Date(),
+                remoteAddress: info.remote
+            )
+            detected.append(app)
+        }
         
         let now = Date()
         var updatedList: [ConnectedApp] = []
@@ -1425,9 +1594,28 @@ public class SplashService: ObservableObject {
         }
     }
     
-    public func terminateApp(app: ConnectedApp) {
-        kill(app.pid, SIGTERM)
+    /// Termina la aplicación cliente indicada.
+    ///
+    /// P-04 / H-05: la interfaz pide confirmación y aquí se reverifica la identidad
+    /// antes de señalizar. Antes se enviaba `SIGTERM` al PID registrado sin comprobar
+    /// que siguiera siendo la misma aplicación (un PID reciclado apuntaba a otro
+    /// proceso) y sin distinguir las apps del propio monitor.
+    /// - Returns: `true` si la aplicación fue terminada.
+    @discardableResult
+    public func terminateApp(app: ConnectedApp) -> Bool {
+        let running = NSRunningApplication(processIdentifier: app.pid)
+        let allowed = ClientTerminationPolicy.canTerminate(
+            pid: app.pid,
+            recordedBundleID: app.bundleId,
+            currentBundleID: running?.bundleIdentifier,
+            currentName: running?.localizedName,
+            isRunning: running != nil,
+            ownBundleID: Bundle.main.bundleIdentifier
+        )
         knownClientsSession.removeValue(forKey: app.pid)
+        guard allowed, let running else { return false }
+        running.terminate()
         self.connectedApps.removeAll(where: { $0.pid == app.pid })
+        return true
     }
 }

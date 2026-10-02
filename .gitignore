@@ -84,4 +84,8 @@ fastlane/test_output
 # Local Agent plans & evaluation
 .hermes/
 splash-monitor-evaluation.html
+splash-monitor-audit-*.html
+
+# Artefactos de empaquetado (se publican como assets del release, no se versionan)
+SHA256SUMS
 

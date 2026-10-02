@@ -1,10 +1,29 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+# Splash Monitor — construcción del bundle .app
+# La versión, el identificador de paquete y el número de compilación se leen de
+# Sources/SplashMonitor/Services/Version.swift: única fuente de verdad (P-15).
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
 cd "$DIR"
 
-echo "🔨 Compilando SplashMonitor en modo Release..."
+VERSION_SWIFT="$DIR/Sources/SplashMonitor/Services/Version.swift"
+if [ ! -f "$VERSION_SWIFT" ]; then
+    echo "❌ No se encontró $VERSION_SWIFT" >&2
+    exit 1
+fi
+
+APP_VERSION="$(sed -n 's/.*static let current = "\([^"]*\)".*/\1/p' "$VERSION_SWIFT" | head -1)"
+BUNDLE_ID="$(sed -n 's/.*static let bundleIdentifier = "\([^"]*\)".*/\1/p' "$VERSION_SWIFT" | head -1)"
+BUILD_NUMBER="$(sed -n 's/.*static let buildNumber = "\([^"]*\)".*/\1/p' "$VERSION_SWIFT" | head -1)"
+
+if [ -z "$APP_VERSION" ] || [ -z "$BUNDLE_ID" ] || [ -z "$BUILD_NUMBER" ]; then
+    echo "❌ No se pudieron extraer versión/identificador/compilación de Version.swift" >&2
+    exit 1
+fi
+
+echo "🔨 Compilando SplashMonitor $APP_VERSION ($BUNDLE_ID) en modo Release..."
 swift build -c release
 
 APP_NAME="Splash Monitor"
@@ -49,7 +68,7 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.incoai.splashmonitor</string>
+    <string>$BUNDLE_ID</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
@@ -57,9 +76,9 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.2-beta</string>
+    <string>$APP_VERSION</string>
     <key>CFBundleVersion</key>
-    <string>3</string>
+    <string>$BUILD_NUMBER</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
@@ -74,10 +93,13 @@ cat <<EOF > "$CONTENTS_DIR/Info.plist"
 </plist>
 EOF
 
-# Firmar el bundle de macOS con ad-hoc signing (sellar Info.plist y recursos)
-echo "✍️  Firmando bundle con firma ad-hoc..."
-codesign --force --deep --sign - "$APP_DIR"
+# Firma ad-hoc. Se firma primero el binario y después el bundle, sin `--deep`:
+# `--deep` está obsoleto y oculta problemas de firma en lugar de resolverlos (P-18).
+# La firma ad-hoc NO acredita al autor: sirve para que macOS acepte el bundle.
+echo "✍️  Firmando binario y bundle (firma ad-hoc, sin --deep)..."
+codesign --force --sign - "$MACOS_DIR/SplashMonitor"
+codesign --force --sign - "$APP_DIR"
+codesign --verify --strict --verbose=2 "$APP_DIR"
 
 echo "✅ App compilada con éxito en: $APP_DIR"
 echo "🚀 Puedes iniciarla ejecutando: open '$APP_DIR'"
-
