@@ -18,7 +18,11 @@ y la generación integral de capturas de pantalla de todos los módulos de la ap
 - **Detección Automática de Claude Desktop / Cowork:** El monitor de conexiones activas (`scanConnectedClients`) ahora reconoce el proceso `com.anthropic.claudefordesktop`, clasificándolo como Agente de Código Autónomo con su icono oficial de macOS y estadísticas de sockets TCP.
 - **Tarjeta de Guía de Integración para Claude Gateway:** Se añadió una tarjeta dedicada en la pestaña de Guía de Conexión de *Apps Conectadas* explicando cómo configurar el Gateway local en Claude for Mac (`http://127.0.0.1:<puerto>`).
 - **Galería Visual de Todos los Módulos:** Se añadieron capturas de pantalla en alta resolución para cada módulo en el repositorio con documentación explicativa.
-- **Ampliación de Pruebas Unitarias:** Se añadieron suites de prueba automáticas (`AgentLaunchTests` y `ScreenshotGeneratorTests`), alcanzando 68 pruebas automatizadas passing.
+- **Ampliación de Pruebas Unitarias:** Se añadieron suites de prueba automáticas (`AgentLaunchTests` y `ScreenshotGeneratorTests`), alcanzando 69 pruebas automatizadas passing.
+
+### 🐛 Correcciones y Mejoras de Comunidad
+
+- **Legibilidad de la Consola de Descarga en Modo Claro:** Corrección de contraste en `ModelManagerView` usando texto blanco de alta opacidad sobre fondo oscuro en lugar de `.primary`, incremento de fuente a 10 pt monoespaciada, mayor altura de visualización (90 pt) y habilitación de `.textSelection(.enabled)` para copiar errores o rutas. Agradecimientos a [@ajaxharg](https://github.com/ajaxharg) (PR [#2](https://github.com/hometrix/SplashMonitor/pull/2)).
 
 ## [1.0.3-beta] - 2026-09-24
 
