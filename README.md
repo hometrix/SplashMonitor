@@ -102,7 +102,7 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 #### 🍎 Experiencia Nativa de macOS
 - **Menu bar extra** con 4 modos de visualización
 - Icono 3D gota líquida con transparencia alpha completa
-- `NavigationSplitView` con 5 secciones en la barra lateral
+- `NavigationSplitView` con 6 secciones en la barra lateral
 - Compatibilidad con macOS 13.0+ en Apple Silicon
 
 </td>
@@ -479,12 +479,62 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 #### 🍎 Native macOS Experience
 - **Menu bar extra** with 4 display modes
 - 3D liquid droplet icon with full alpha transparency
-- `NavigationSplitView` with 5 sidebar sections
+- `NavigationSplitView` with 6 sidebar sections
 - macOS 13.0+ compatibility on Apple Silicon
 
 </td>
 </tr>
 </table>
+
+---
+
+### 📸 Visual Tour by Modules
+
+Every module of **Splash Monitor** is designed and optimized for a native Apple Silicon macOS experience:
+
+<div align="center">
+
+#### 1. 🕹️ Server Controls & Agent Launchers (with Claude Cowork)
+<img src="screenshots/module-server.png" width="850" alt="Server Controls and Code Agent Launchers" />
+<p><b>Server Control Module:</b> Start and stop the Splash server with one click, hot-swap models without restarting, configure custom listening ports, and launch autonomous coding agents: <b>Claude Cowork</b> (native AppKit launch with model aliases to prevent 404 errors), <b>Claude Code CLI</b>, <b>OpenCode</b>, <b>Codex</b>, and <b>Hermes</b>.</p>
+
+<br/>
+
+#### 2. 📊 Real-Time Token & Metal Performance Dashboard
+<img src="screenshots/module-dashboard.png" width="850" alt="Real-Time Token & Metal Performance Dashboard" />
+<p><b>Real-Time Performance Module:</b> Live token generation speed telemetry (DECODE and PREFILL in tok/s), KV Cache hit ratio and token reuse, DFlash 2 speculative decoding acceptance rates, TTFT/ITL latencies, and Apple Silicon Metal unified memory usage (M3/M4/M5).</p>
+
+<br/>
+
+#### 3. 🔌 Connected Applications & Active TCP Clients
+<img src="screenshots/module-connectedApps.png" width="850" alt="Connected Applications and Active Clients" />
+<p><b>Connected Clients Module:</b> Automatic inspection of active TCP sockets against the inference port, recognizing clients such as <b>Claude Desktop / Cowork</b>, Cursor IDE, VS Code, and Chatbots with their native macOS application icons and stream state.</p>
+
+<br/>
+
+#### 4. 📖 Client Connection Guide & Local Gateway
+<img src="screenshots/module-connectedApps-guide.png" width="850" alt="Client Connection Guide" />
+<p><b>Connection Guide Module:</b> Quick setup instructions and one-click copyable configuration snippets for Claude Desktop, Cursor IDE, VS Code (Cline/Continue), Chatbox, and Python scripts (OpenAI SDK / LangChain).</p>
+
+<br/>
+
+#### 5. 📦 Hugging Face Local Model Manager
+<img src="screenshots/module-models.png" width="850" alt="Hugging Face Local Model Manager" />
+<p><b>Model Management Module:</b> Disk footprint inspection for local models, hot-swap deployment, and Hugging Face catalog exploration with single-click background installation.</p>
+
+<br/>
+
+#### 6. ⚙️ System Preferences & Settings
+<img src="screenshots/module-settings.png" width="850" alt="System Preferences and Settings" />
+<p><b>Settings Module:</b> Language selector (Dominican Spanish 🇩🇴 / English 🇬🇧 / macOS auto-sync), customizable macOS menu bar item display modes, and background polling interval controls.</p>
+
+<br/>
+
+#### 7. ℹ️ About Splash Monitor
+<img src="screenshots/module-about.png" width="850" alt="About Splash Monitor" />
+<p><b>About Module:</b> Version information (v1.0.4-beta), native Swift 6 and Metal architecture details, MIT open-source license, and author credits for Joan Gregorio Pérez (JMGREP Developers).</p>
+
+</div>
 
 ---
 
