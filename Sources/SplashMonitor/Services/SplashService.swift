@@ -86,6 +86,8 @@ public class SplashService: ObservableObject {
     @AppStorage("menuBarDisplayMode") public var menuBarDisplayMode: String = "speed" // "icon", "speed", "tokens", "model"
     @AppStorage("runInBackground") public var runInBackground: Bool = true
     @AppStorage("lastUsedPort") public var lastUsedPort: Int = 8000
+    @AppStorage("listenOnAllInterfaces") public var listenOnAllInterfaces: Bool = false
+    @AppStorage("maxContext") public var maxContext: String = "auto"
     
     // Update check
     @Published public var hasUpdate: Bool = false
@@ -1089,15 +1091,32 @@ public class SplashService: ObservableObject {
             let splashPath = self.splashExecutablePath
             let modelAliases = ["claude-haiku-4-5", "claude-3-5-sonnet-latest", "claude-sonnet-4-5"]
             let aliasFlags = modelAliases.map { "--served-model-name \"\($0)\"" }.joined(separator: " ")
-            // SIEMPRE usar --port nativo (Splash lo soporta desde v1.0) con alias de modelos para Claude Desktop / Cowork
-            let runCmd = "\"\(splashPath)\" serve --model \"\(validatedModel)\" --port \"\(port)\" \(aliasFlags)"
+            
+            // Opciones de red y contexto (--host y --max-context)
+            let hostFlag = self.listenOnAllInterfaces ? "--host \"0.0.0.0\"" : "--host \"127.0.0.1\""
+            var contextFlag = ""
+            let trimmedContext = self.maxContext.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedContext.isEmpty && trimmedContext.lowercased() != "auto" {
+                let allowedChars = CharacterSet(charactersIn: "0123456789kmKM")
+                if trimmedContext.unicodeScalars.allSatisfy({ allowedChars.contains($0) }) {
+                    contextFlag = "--max-context \"\(trimmedContext.uppercased())\""
+                }
+            }
+            
+            let extraOptions = [hostFlag, contextFlag].filter { !$0.isEmpty }.joined(separator: " ")
+            let runCmd = "\"\(splashPath)\" serve --model \"\(validatedModel)\" --port \"\(port)\" \(extraOptions) \(aliasFlags)"
+            
+            let hostLabel = self.listenOnAllInterfaces ? "0.0.0.0 (Toda la red local / LAN)" : "127.0.0.1 (Solo localhost)"
+            let contextLabel = (trimmedContext.isEmpty || trimmedContext.lowercased() == "auto") ? "Automático (por memoria)" : trimmedContext.uppercased()
             
             let cmd = """
             echo "🌊 ==============================================="
             echo "🚀 Iniciando Servidor Splash..."
-            echo "📦 Modelo: \(validatedModel)"
-            echo "🔌 Puerto: \(port)"
-            echo "⚡️ Motor:  \(splashPath)"
+            echo "📦 Modelo:   \(validatedModel)"
+            echo "🔌 Puerto:   \(port)"
+            echo "🌐 Red/Host: \(hostLabel)"
+            echo "🧠 Contexto: \(contextLabel)"
+            echo "⚡️ Motor:    \(splashPath)"
             echo "==============================================="
             echo "Presiona Ctrl+C en esta ventana para detener el servidor."
             echo ""

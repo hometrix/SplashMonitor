@@ -462,6 +462,53 @@ public struct MainWindowView: View {
             .background(Color(nsColor: .controlBackgroundColor))
             .cornerRadius(10)
             
+            // Server Network & Context Options
+            VStack(alignment: .leading, spacing: 10) {
+                Text(loc.isSpanish ? "Opciones del Motor de Inferencia" : "Inference Engine Options")
+                    .font(.system(size: 13, weight: .semibold))
+                
+                Toggle(loc.isSpanish
+                       ? "Permitir conexiones entrantes desde la red local (enlazar a 0.0.0.0)"
+                       : "Allow incoming connections from local network (bind to 0.0.0.0)",
+                       isOn: $service.listenOnAllInterfaces)
+                    .font(.system(size: 12))
+                
+                Text(loc.isSpanish
+                     ? "Por defecto, Splash solo escucha en 127.0.0.1 (localhost). Activa esta opción para permitir que otros dispositivos, servidores o agentes en tu red local (LAN) realicen inferencias en tu Mac."
+                     : "By default, Splash only listens on 127.0.0.1 (localhost). Enable this option to let other devices, servers, or agents on your local network (LAN) run inference on this Mac.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                
+                Divider()
+                
+                HStack {
+                    Text(loc.isSpanish ? "Límite de ventana de contexto:" : "Context window limit:")
+                        .font(.system(size: 12))
+                    
+                    Spacer()
+                    
+                    Picker("", selection: $service.maxContext) {
+                        Text(loc.isSpanish ? "Automático (gestión de Splash)" : "Automatic (managed by Splash)").tag("auto")
+                        Text("16K (16,384 tokens)").tag("16K")
+                        Text("32K (32,768 tokens)").tag("32K")
+                        Text("64K (65,536 tokens)").tag("64K")
+                        Text("128K (131,072 tokens)").tag("128K")
+                        Text("256K (262,144 tokens)").tag("256K")
+                    }
+                    .labelsHidden()
+                    .frame(width: 220)
+                }
+                
+                Text(loc.isSpanish
+                     ? "Configura el parámetro --max-context para limitar o expandir la memoria reservada para el historial de tokens."
+                     : "Configures the --max-context flag to limit or expand memory reserved for token history.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            .padding(14)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(10)
+            
             // Check for updates
             VStack(alignment: .leading, spacing: 8) {
                 HStack {

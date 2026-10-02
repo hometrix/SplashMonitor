@@ -18,7 +18,9 @@ y la generación integral de capturas de pantalla de todos los módulos de la ap
 - **Detección Automática de Claude Desktop / Cowork:** El monitor de conexiones activas (`scanConnectedClients`) ahora reconoce el proceso `com.anthropic.claudefordesktop`, clasificándolo como Agente de Código Autónomo con su icono oficial de macOS y estadísticas de sockets TCP.
 - **Tarjeta de Guía de Integración para Claude Gateway:** Se añadió una tarjeta dedicada en la pestaña de Guía de Conexión de *Apps Conectadas* explicando cómo configurar el Gateway local en Claude for Mac (`http://127.0.0.1:<puerto>`).
 - **Galería Visual de Todos los Módulos:** Se añadieron capturas de pantalla en alta resolución para cada módulo en el repositorio con documentación explicativa.
-- **Ampliación de Pruebas Unitarias:** Se añadieron suites de prueba automáticas (`AgentLaunchTests` y `ScreenshotGeneratorTests`), alcanzando 69 pruebas automatizadas passing.
+- **Enlace de Red Configurable (Acceso LAN con `--host 0.0.0.0`):** Selector interactivo y persistente para alternar entre enlace local (`127.0.0.1`) o exponer el motor a la red local (`0.0.0.0`), permitiendo que otros dispositivos o agentes en la LAN utilicen la inferencia del Mac (atiende [Issue #1](https://github.com/hometrix/SplashMonitor/issues/1)).
+- **Límite de Ventana de Contexto (`--max-context`):** Selector configurable (`Auto`, `16K`, `32K`, `64K`, `128K`, `256K`) con sanitización estricta de parámetros para ajustar la memoria reservada al historial de tokens (atiende [Issue #1](https://github.com/hometrix/SplashMonitor/issues/1)).
+- **Ampliación de Pruebas Unitarias:** Se añadieron suites de prueba automáticas (`AgentLaunchTests`, `ScreenshotGeneratorTests` y `ServerOptionsTests`), alcanzando 73 pruebas automatizadas passing.
 
 ### 🐛 Correcciones y Mejoras de Comunidad
 

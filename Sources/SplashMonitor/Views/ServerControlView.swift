@@ -391,6 +391,91 @@ public struct ServerControlView: View {
                     }
                 }
                 
+                Divider()
+                    .frame(height: 14)
+                
+                // Selector de Host / Red (127.0.0.1 vs 0.0.0.0)
+                Menu {
+                    Button {
+                        service.listenOnAllInterfaces = false
+                    } label: {
+                        HStack {
+                            Text("127.0.0.1 (Localhost)")
+                            if !service.listenOnAllInterfaces {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    Button {
+                        service.listenOnAllInterfaces = true
+                    } label: {
+                        HStack {
+                            Text(tr(es: "0.0.0.0 (Acceso LAN)", en: "0.0.0.0 (LAN Access)"))
+                            if service.listenOnAllInterfaces {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: service.listenOnAllInterfaces ? "network" : "lock.laptopcomputer")
+                            .font(.system(size: 9))
+                            .foregroundColor(service.listenOnAllInterfaces ? .blue : .secondary)
+                        Text(service.listenOnAllInterfaces ? "0.0.0.0 (LAN)" : "127.0.0.1")
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(tr(
+                    es: "127.0.0.1 solo acepta conexiones en este Mac. 0.0.0.0 expone el servidor a tu red local (LAN) para que otros equipos puedan conectarse.",
+                    en: "127.0.0.1 only accepts connections from this Mac. 0.0.0.0 exposes the server to your local network (LAN) for other devices to connect."
+                ))
+                
+                Divider()
+                    .frame(height: 14)
+                
+                // Selector de Contexto Máximo (--max-context)
+                Menu {
+                    Button {
+                        service.maxContext = "auto"
+                    } label: {
+                        HStack {
+                            Text(tr(es: "Automático (por memoria)", en: "Auto (by memory)"))
+                            if service.maxContext == "auto" {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    Divider()
+                    ForEach(["16K", "32K", "64K", "128K", "256K"], id: \.self) { ctx in
+                        Button {
+                            service.maxContext = ctx
+                        } label: {
+                            HStack {
+                                Text("\(ctx) tokens")
+                                if service.maxContext == ctx {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 9))
+                            .foregroundColor(.purple)
+                        Text(service.maxContext == "auto" ? "Ctx: Auto" : "Ctx: \(service.maxContext)")
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(tr(
+                    es: "Límite máximo de tokens de contexto (--max-context) para la inferencia de Splash.",
+                    en: "Maximum context token limit (--max-context) for Splash inference."
+                ))
+                
                 Spacer()
                 
                 let targetModel = isCustomModel ? customModelText.trimmingCharacters(in: .whitespacesAndNewlines) : service.selectedModelForLaunch

@@ -84,6 +84,7 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 - Selector de modelo interactivo con cambio en caliente
 - Iniciar / detener el servidor en un clic
 - Lanzadores de agentes: **Claude Code**, **Claude Cowork**, **OpenCode**, **Codex**, **Hermes**
+- Selección de puerto, enlace de red LAN (0.0.0.0 / 127.0.0.1) y límite de contexto (`--max-context`)
 - Copia de endpoint compatible con OpenAI
 
 </td>
@@ -461,6 +462,7 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 - Interactive model selector with hot-swapping
 - Start / stop the server with one click
 - Code agent launchers: **Claude Code**, **Claude Cowork**, **OpenCode**, **Codex**, **Hermes**
+- Port selection, LAN network bind (0.0.0.0 / 127.0.0.1), and context limit (`--max-context`)
 - One-click OpenAI-compatible API endpoint copying
 
 </td>
