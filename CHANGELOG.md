@@ -5,6 +5,21 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.5-beta] - 2026-10-02
+
+Versión enfocada en la conectividad en red local (LAN) y dominios remotos/DDNS,
+resolviendo la protección estricta contra DNS Rebinding de Splash y optimizando la
+monitorización de clientes de red.
+
+### 🚀 Novedades y Características
+
+- **Soporte de Dominios y Hosts Permitidos (`--allowed-host`):** Nuevo campo de configuración en *Opciones del Motor de Inferencia* que permite declarar dominios DDNS (ej. DuckDNS, ngrok, Cloudflare Tunnel o nombres de host Bonjour `.local`). Los parámetros se sanitizan e inyectan automáticamente en `splash serve --allowed-host <host>`, resolviendo los bloqueos de seguridad HTTP 403 Forbidden por mitigación de DNS Rebinding.
+- **Resolución Automática de IP de Red Local (LAN):** Nuevo módulo `NetworkInterfaceHelper` que resuelve la dirección IPv4 activa del Mac en interfaces de red primarias (`en0`, `en1`), evitando direcciones de bucle invertido (`127.x.x.x`) y enlace local (`169.254.x.x`).
+- **Detección y Monitoreo de Clientes LAN:** Nueva categoría `AppCategory.lanClient` (`Cliente Remoto / Red LAN`) en `scanConnectedClients`, que reconoce e inspecciona conexiones entrantes remotas desde otros equipos o servidores de la red local, reflejándolas con su respectiva IP en la lista de apps activas e integrándolas en el contador total de sockets TCP.
+- **Métricas y Tarjetas de Estado Dinámicas:** La tarjeta de *Sockets TCP Activos* en la pestaña *Apps Conectadas* ahora refleja dinámicamente si el motor está enlazado a la red local (`Conexiones LAN (IP)` / `0.0.0.0`) o en localhost (`Conexiones 127.0.0.1`), corrigiendo el texto estático anterior.
+- **Endpoints de Integración y Guías de Conexión Adaptativas:** Los botones de copia rápida (`Copiar OpenAI URL` y `Copiar Env Vars`) y las tarjetas de la *Guía de Conexión* (Cursor IDE, VS Code/Cline, Claude Code CLI, Claude Desktop, Chatbox, Python, cURL) ahora adaptan automáticamente sus URLs y ejemplos al host preferido (dominio configurado o IP local) cuando el enlace LAN está habilitado.
+- **Cobertura de Pruebas Ampliada:** Se añadieron nuevos casos de prueba en `ServerOptionsTests` para `preferredHostOrIP`, inyección de `--allowed-host` y propiedades de `lanClient`, totalizando 76 tests automatizados con 0 fallos.
+
 ## [1.0.4-beta] - 2026-10-02
 
 Versión orientada a la integración nativa de agentes visuales y autónomos en macOS,

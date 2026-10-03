@@ -113,10 +113,22 @@ public struct ConnectedAppsView: View {
                 color: activeCount > 0 ? .green : .secondary
             )
             
+            let hostSubtitle: String = {
+                if service.listenOnAllInterfaces {
+                    if let ip = service.localNetworkIP {
+                        return tr(es: "Conexiones LAN (\(ip))", en: "LAN (\(ip))")
+                    } else {
+                        return tr(es: "Conexiones Red LAN (0.0.0.0)", en: "LAN Connections (0.0.0.0)")
+                    }
+                } else {
+                    return tr(es: "Conexiones 127.0.0.1", en: "127.0.0.1 connections")
+                }
+            }()
+            
             StatBadgeCard(
                 title: tr(es: "Sockets TCP Activos", en: "Active TCP Sockets"),
                 value: "\(totalSockets)",
-                subtitle: tr(es: "Conexiones 127.0.0.1", en: "127.0.0.1 connections"),
+                subtitle: hostSubtitle,
                 icon: "network",
                 color: totalSockets > 0 ? .blue : .secondary
             )
@@ -205,7 +217,8 @@ public struct ConnectedAppsView: View {
             
             HStack(spacing: 10) {
                 Button {
-                    copyToClipboard("http://127.0.0.1:\(service.activePort)/v1")
+                    let host = service.preferredHostOrIP
+                    copyToClipboard("http://\(host):\(service.activePort)/v1")
                     showCopied(tr(es: "¡URL Copiada!", en: "URL Copied!"))
                 } label: {
                     Label(tr(es: "Copiar OpenAI Base URL", en: "Copy OpenAI Base URL"), systemImage: "doc.on.doc")
@@ -240,13 +253,19 @@ public struct ConnectedAppsView: View {
     
     // MARK: - Quick Connect Guide Section
     private var quickConnectGuideSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let host = service.preferredHostOrIP
+        
+        return VStack(alignment: .leading, spacing: 14) {
             Text(tr(es: "Conectar tus Aplicaciones e IDEs Favoritos", en: "Connect Your Favorite Apps & IDEs"))
                 .font(.system(size: 14, weight: .bold))
             
             Text(tr(
-                es: "Splash expone una API compatible al 100% con OpenAI y Anthropic en tu máquina local:",
-                en: "Splash exposes a 100% OpenAI & Anthropic compatible API on your local machine:"
+                es: service.listenOnAllInterfaces
+                    ? "Splash expone una API compatible al 100% con OpenAI y Anthropic accesible en tu LAN (\(host)):"
+                    : "Splash expone una API compatible al 100% con OpenAI y Anthropic en tu máquina local:",
+                en: service.listenOnAllInterfaces
+                    ? "Splash exposes a 100% OpenAI & Anthropic compatible API accessible on your LAN (\(host)):"
+                    : "Splash exposes a 100% OpenAI & Anthropic compatible API on your local machine:"
             ))
             .font(.system(size: 11))
             .foregroundColor(.secondary)
@@ -262,9 +281,9 @@ public struct ConnectedAppsView: View {
                         tr(es: "1. Ve a Settings → Models en Cursor", en: "1. Go to Settings → Models in Cursor"),
                         tr(es: "2. Activa 'OpenAI API Key' (ingresa cualquier texto, ej. 'splash')", en: "2. Enable 'OpenAI API Key' (enter any text, e.g. 'splash')"),
                         tr(es: "3. En 'Override OpenAI Base URL', coloca:", en: "3. In 'Override OpenAI Base URL', enter:"),
-                        "http://127.0.0.1:\(service.activePort)/v1"
+                        "http://\(host):\(service.activePort)/v1"
                     ],
-                    copyText: "http://127.0.0.1:\(service.activePort)/v1"
+                    copyText: "http://\(host):\(service.activePort)/v1"
                 )
                 
                 IntegrationGuideCard(
@@ -277,9 +296,9 @@ public struct ConnectedAppsView: View {
                         tr(es: "1. En la extensión Continue/Cline, añade un nuevo modelo", en: "1. In Continue/Cline extension, add a new model"),
                         tr(es: "2. Selecciona proveedor 'OpenAI' o 'Custom'", en: "2. Select provider 'OpenAI' or 'Custom'"),
                         tr(es: "3. Configura el apiBase en config.json:", en: "3. Set apiBase in config.json:"),
-                        "http://127.0.0.1:\(service.activePort)/v1"
+                        "http://\(host):\(service.activePort)/v1"
                     ],
-                    copyText: "http://127.0.0.1:\(service.activePort)/v1"
+                    copyText: "http://\(host):\(service.activePort)/v1"
                 )
                 
                 IntegrationGuideCard(
@@ -290,11 +309,11 @@ public struct ConnectedAppsView: View {
                     color: .orange,
                     steps: [
                         tr(es: "1. Exporta la variable de entorno de Splash:", en: "1. Export Splash environment variable:"),
-                        "export ANTHROPIC_BASE_URL=\"http://127.0.0.1:\(service.activePort)\"",
+                        "export ANTHROPIC_BASE_URL=\"http://\(host):\(service.activePort)\"",
                         tr(es: "2. Lanza Claude Code en tu terminal:", en: "2. Launch Claude Code in your terminal:"),
                         "splash claude"
                     ],
-                    copyText: "export ANTHROPIC_BASE_URL=\"http://127.0.0.1:\(service.activePort)\"\nsplash claude"
+                    copyText: "export ANTHROPIC_BASE_URL=\"http://\(host):\(service.activePort)\"\nsplash claude"
                 )
                 
                 IntegrationGuideCard(
@@ -306,10 +325,10 @@ public struct ConnectedAppsView: View {
                     steps: [
                         tr(es: "1. En Claude for Mac, selecciona tu Gateway local", en: "1. In Claude for Mac, select your local Gateway"),
                         tr(es: "2. Host / Endpoint URL:", en: "2. Host / Endpoint URL:"),
-                        "http://127.0.0.1:\(service.activePort)",
+                        "http://\(host):\(service.activePort)",
                         tr(es: "3. Splash responderá a sondeos de claude-haiku-4-5 y sonnet", en: "3. Splash responds to claude-haiku-4-5 & sonnet probes")
                     ],
-                    copyText: "http://127.0.0.1:\(service.activePort)"
+                    copyText: "http://\(host):\(service.activePort)"
                 )
                 
                 IntegrationGuideCard(
@@ -321,10 +340,10 @@ public struct ConnectedAppsView: View {
                     steps: [
                         tr(es: "1. En Ajustes del Chatbot, elige 'OpenAI API'", en: "1. In Chatbot Settings, choose 'OpenAI API'"),
                         tr(es: "2. Host / API Host:", en: "2. Host / API Host:"),
-                        "http://127.0.0.1:\(service.activePort)",
+                        "http://\(host):\(service.activePort)",
                         tr(es: "3. API Key: 'splash' (no requerida pero obligatoria en algunas UIs)", en: "3. API Key: 'splash' (any string)")
                     ],
-                    copyText: "http://127.0.0.1:\(service.activePort)/v1"
+                    copyText: "http://\(host):\(service.activePort)/v1"
                 )
                 
                 IntegrationGuideCard(
@@ -335,10 +354,10 @@ public struct ConnectedAppsView: View {
                     color: .cyan,
                     steps: [
                         "from openai import OpenAI",
-                        "client = OpenAI(base_url='http://127.0.0.1:\(service.activePort)/v1', api_key='splash')",
+                        "client = OpenAI(base_url='http://\(host):\(service.activePort)/v1', api_key='splash')",
                         "resp = client.chat.completions.create(model='\(service.activeModel)', messages=[...])"
                     ],
-                    copyText: "from openai import OpenAI\nclient = OpenAI(base_url='http://127.0.0.1:\(service.activePort)/v1', api_key='splash')"
+                    copyText: "from openai import OpenAI\nclient = OpenAI(base_url='http://\(host):\(service.activePort)/v1', api_key='splash')"
                 )
                 
                 IntegrationGuideCard(
@@ -348,11 +367,11 @@ public struct ConnectedAppsView: View {
                     badge: "REST HTTP",
                     color: .indigo,
                     steps: [
-                        "curl http://127.0.0.1:\(service.activePort)/v1/chat/completions \\",
+                        "curl http://\(host):\(service.activePort)/v1/chat/completions \\",
                         "  -H 'Content-Type: application/json' \\",
                         "  -d '{\"model\": \"\(service.activeModel)\", \"messages\": [{\"role\": \"user\", \"content\": \"Hola!\"}]}'"
                     ],
-                    copyText: "curl http://127.0.0.1:\(service.activePort)/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\": \"\(service.activeModel)\", \"messages\": [{\"role\": \"user\", \"content\": \"Hola\"}]}'"
+                    copyText: "curl http://\(host):\(service.activePort)/v1/chat/completions -H 'Content-Type: application/json' -d '{\"model\": \"\(service.activeModel)\", \"messages\": [{\"role\": \"user\", \"content\": \"Hola\"}]}'"
                 )
             }
         }
@@ -475,36 +494,51 @@ struct ConnectedAppCard: View {
             }
             
             // Actions
-            HStack(spacing: 6) {
-                Button {
-                    service.activateApp(app: app)
-                } label: {
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.system(size: 12))
+            if app.category != .lanClient {
+                HStack(spacing: 6) {
+                    Button {
+                        service.activateApp(app: app)
+                    } label: {
+                        Image(systemName: "arrow.up.forward.app")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(loc.isSpanish ? "Traer app al frente" : "Bring app to front")
+                    
+                    Button {
+                        service.revealAppInFinder(app: app)
+                    } label: {
+                        Image(systemName: "folder")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(loc.isSpanish ? "Ver en Finder" : "Reveal in Finder")
+                    
+                    Button(role: .destructive) {
+                        confirmingTermination = true
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help(loc.isSpanish ? "Terminar proceso cliente" : "Terminate client process")
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help(loc.isSpanish ? "Traer app al frente" : "Bring app to front")
-                
-                Button {
-                    service.revealAppInFinder(app: app)
-                } label: {
-                    Image(systemName: "folder")
-                        .font(.system(size: 12))
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 10))
+                        .foregroundColor(.indigo)
+                    Text(loc.isSpanish ? "Red LAN" : "LAN Network")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help(loc.isSpanish ? "Ver en Finder" : "Reveal in Finder")
-                
-                Button(role: .destructive) {
-                    confirmingTermination = true
-                } label: {
-                    Image(systemName: "xmark.circle")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help(loc.isSpanish ? "Terminar proceso cliente" : "Terminate client process")
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(Color.indigo.opacity(0.12))
+                .cornerRadius(4)
             }
         }
         .padding(10)
@@ -540,6 +574,7 @@ struct ConnectedAppCard: View {
         case .chatbot: return .green
         case .terminal: return .blue
         case .customScript: return .cyan
+        case .lanClient: return .indigo
         }
     }
     

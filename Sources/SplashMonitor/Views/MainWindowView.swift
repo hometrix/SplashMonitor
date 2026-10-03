@@ -477,7 +477,23 @@ public struct MainWindowView: View {
                      ? "Por defecto, Splash solo escucha en 127.0.0.1 (localhost). Activa esta opción para permitir que otros dispositivos, servidores o agentes en tu red local (LAN) realicen inferencias en tu Mac."
                      : "By default, Splash only listens on 127.0.0.1 (localhost). Enable this option to let other devices, servers, or agents on your local network (LAN) run inference on this Mac.")
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                if service.listenOnAllInterfaces {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(loc.isSpanish ? "Dominios o Hosts Permitidos (--allowed-host):" : "Allowed Domains or Hosts (--allowed-host):")
+                            .font(.system(size: 11, weight: .medium))
+                        
+                        TextField(loc.isSpanish ? "ej. midominio.duckdns.org, mimac.local" : "e.g. mydomain.duckdns.org, mymac.local", text: $service.allowedHosts)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 11, design: .monospaced))
+                        
+                        Text(loc.isSpanish
+                             ? "Splash bloquea por seguridad cualquier petición con un Host desconocido (protección DNS Rebinding). Ingresa tus dominios DDNS o nombres de host separados por comas."
+                             : "Splash blocks requests with unknown Host headers for security (DNS Rebinding protection). Enter your DDNS domains or hostnames separated by commas.")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 4)
+                }
                 
                 Divider()
                 

@@ -17,8 +17,8 @@
 [![macOS 13.0+](https://img.shields.io/badge/macOS-13.0%2B%20%7C%20Apple%20Silicon-black?style=for-the-badge&logo=apple)](https://developer.apple.com/macos/)
 [![Swift 6](https://img.shields.io/badge/Swift-6.0-F05138?style=for-the-badge&logo=swift&logoColor=white)](https://www.swift.org/)
 [![Apple Silicon](https://img.shields.io/badge/Apple%20Silicon-M3%20%7C%20M4%20%7C%20M5-0071e3?style=for-the-badge)](https://www.apple.com/silicon/)
-[![Version](https://img.shields.io/badge/Version-1.0.4--beta-orange?style=for-the-badge)](https://github.com/hometrix/SplashMonitor/releases/tag/v1.0.4-beta)
-[![Download DMG](https://img.shields.io/badge/Download-DMG%20Installer-success?style=for-the-badge&logo=apple)](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.4-beta/SplashMonitor-1.0.4-beta.dmg)
+[![Version](https://img.shields.io/badge/Version-1.0.5--beta-orange?style=for-the-badge)](https://github.com/hometrix/SplashMonitor/releases/tag/v1.0.5-beta)
+[![Download DMG](https://img.shields.io/badge/Download-DMG%20Installer-success?style=for-the-badge&logo=apple)](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.5-beta/SplashMonitor-1.0.5-beta.dmg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![Author](https://img.shields.io/badge/Author-JMGREP%20Developers%20%7C%20Joan%20Gregorio%20P%C3%A9rez-00205B?style=for-the-badge)](#-autor--author)
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Donate-yellow?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hometrix9)
@@ -85,7 +85,7 @@ Hasta ahora, [Splash](https://inco.ai/blog/splash/) solo podía operarse desde l
 - Selector de modelo interactivo con cambio en caliente
 - Iniciar / detener el servidor en un clic
 - Lanzadores de agentes: **Claude Code**, **Claude Cowork**, **OpenCode**, **Codex**, **Hermes**
-- Selección de puerto, enlace de red LAN (0.0.0.0 / 127.0.0.1) y límite de contexto (`--max-context`)
+- Selección de puerto, enlace de red LAN (0.0.0.0 / 127.0.0.1), dominios o hosts permitidos (`--allowed-host`) y límite de contexto (`--max-context`)
 - Copia de endpoint compatible con OpenAI
 
 </td>
@@ -157,7 +157,7 @@ Cada módulo de **Splash Monitor** está optimizado para la experiencia nativa d
 
 #### 7. ℹ️ Acerca de Splash Monitor
 <img src="screenshots/module-about.png" width="850" alt="Acerca de Splash Monitor" />
-<p><b>Módulo Informativo:</b> Información de versión (v1.0.4-beta), arquitectura nativa en Swift 6 y Metal, licencia abierta MIT y créditos de autoría de Joan Gregorio Pérez (JMGREP Developers).</p>
+<p><b>Módulo Informativo:</b> Información de versión (v1.0.5-beta), arquitectura nativa en Swift 6 y Metal, licencia abierta MIT y créditos de autoría de Joan Gregorio Pérez (JMGREP Developers).</p>
 
 </div>
 
@@ -212,16 +212,16 @@ curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts
 > ⚡️ Este comando consulta la última publicación en GitHub, descarga el DMG oficial,
 > **verifica su suma SHA-256** contra el fichero `SHA256SUMS` publicado y aborta si no
 > coincide, lo monta, copia la app a `/Applications` y la abre automáticamente.
-> Fija una versión concreta con `SPLASH_MONITOR_TAG=v1.0.4-beta`.
+> Fija una versión concreta con `SPLASH_MONITOR_TAG=v1.0.5-beta`.
 
 ---
 
 #### Opción C — Descarga Manual del DMG
 
 1. **Descarga** el instalador oficial:
-   👉 [**SplashMonitor-1.0.4-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.4-beta/SplashMonitor-1.0.4-beta.dmg)
+   👉 [**SplashMonitor-1.0.5-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.5-beta/SplashMonitor-1.0.5-beta.dmg)
 
-   Y su suma de verificación: [**SHA256SUMS**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.4-beta/SHA256SUMS)
+   Y su suma de verificación: [**SHA256SUMS**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.5-beta/SHA256SUMS)
 
    ```bash
    shasum -a 256 -c SHA256SUMS   # debe imprimir "OK"
@@ -475,7 +475,7 @@ Until now, [Splash](https://inco.ai/blog/splash/) could only be operated from th
 - Interactive model selector with hot-swapping
 - Start / stop the server with one click
 - Code agent launchers: **Claude Code**, **Claude Cowork**, **OpenCode**, **Codex**, **Hermes**
-- Port selection, LAN network bind (0.0.0.0 / 127.0.0.1), and context limit (`--max-context`)
+- Port selection, LAN network bind (0.0.0.0 / 127.0.0.1), allowed domains or hosts (`--allowed-host`), and context limit (`--max-context`)
 - One-click OpenAI-compatible API endpoint copying
 
 </td>
@@ -547,7 +547,7 @@ Every module of **Splash Monitor** is designed and optimized for a native Apple 
 
 #### 7. ℹ️ About Splash Monitor
 <img src="screenshots/module-about.png" width="850" alt="About Splash Monitor" />
-<p><b>About Module:</b> Version information (v1.0.4-beta), native Swift 6 and Metal architecture details, MIT open-source license, and author credits for Joan Gregorio Pérez (JMGREP Developers).</p>
+<p><b>About Module:</b> Version information (v1.0.5-beta), native Swift 6 and Metal architecture details, MIT open-source license, and author credits for Joan Gregorio Pérez (JMGREP Developers).</p>
 
 </div>
 
@@ -602,16 +602,16 @@ curl -fsSL https://raw.githubusercontent.com/hometrix/SplashMonitor/main/scripts
 > ⚡️ This script resolves the latest release, downloads the official DMG, **verifies its
 > SHA-256 checksum** against the published `SHA256SUMS` file (aborting on mismatch),
 > mounts it, installs to `/Applications`, and opens the app automatically.
-> Pin a specific version with `SPLASH_MONITOR_TAG=v1.0.4-beta`.
+> Pin a specific version with `SPLASH_MONITOR_TAG=v1.0.5-beta`.
 
 ---
 
 #### Option C — Manual DMG Download
 
 1. **Download** the official installer:
-   👉 [**SplashMonitor-1.0.4-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.4-beta/SplashMonitor-1.0.4-beta.dmg)
+   👉 [**SplashMonitor-1.0.5-beta.dmg**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.5-beta/SplashMonitor-1.0.5-beta.dmg)
 
-   And its checksum file: [**SHA256SUMS**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.4-beta/SHA256SUMS)
+   And its checksum file: [**SHA256SUMS**](https://github.com/hometrix/SplashMonitor/releases/download/v1.0.5-beta/SHA256SUMS)
 
    ```bash
    shasum -a 256 -c SHA256SUMS   # must print "OK"

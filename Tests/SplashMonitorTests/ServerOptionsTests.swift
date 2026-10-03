@@ -101,6 +101,59 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertFalse(cmd.contains("rm -rf"), "No debe contener comandos inyectados: \(cmd)")
         XCTAssertFalse(cmd.contains("--max-context"), "Debe omitir el flag ante caracteres sospechosos: \(cmd)")
     }
+    
+    func testPreferredHostOrIPReflectsListenOnAllInterfaces() throws {
+        let dir = try TempDirectory()
+        let (service, _) = makeService(directory: dir.url)
+        
+        service.allowedHosts = ""
+        service.listenOnAllInterfaces = false
+        XCTAssertEqual(service.preferredHostOrIP, "127.0.0.1")
+        
+        service.listenOnAllInterfaces = true
+        if let ip = service.localNetworkIP {
+            XCTAssertEqual(service.preferredHostOrIP, ip)
+        } else {
+            XCTAssertEqual(service.preferredHostOrIP, "127.0.0.1")
+        }
+        
+        service.allowedHosts = "midominio.duckdns.org"
+        XCTAssertEqual(service.preferredHostOrIP, "midominio.duckdns.org")
+    }
+    
+    func testLanClientAppCategoryProperties() {
+        let app = ConnectedApp(
+            pid: 91234,
+            name: "Cliente LAN (192.168.1.120)",
+            category: .lanClient,
+            connectionCount: 2,
+            remoteAddress: "192.168.1.120:54321"
+        )
+        XCTAssertEqual(app.category, .lanClient)
+        XCTAssertEqual(app.category.iconName, "network")
+        XCTAssertEqual(app.category.localizedName(isSpanish: true), "Cliente Remoto / Red LAN")
+        XCTAssertEqual(app.category.localizedName(isSpanish: false), "Remote Client / LAN Network")
+    }
+    
+    func testServerLaunchWithAllowedHostsInjectsFlags() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        service.listenOnAllInterfaces = true
+        service.allowedHosts = "midominio.duckdns.org, mimac.local; test.com"
+        
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmd = capturedCommand.value else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        XCTAssertTrue(cmd.contains("--allowed-host \"midominio.duckdns.org\""), "Debe inyectar el host permitido: \(cmd)")
+        XCTAssertTrue(cmd.contains("--allowed-host \"mimac.local\""), "Debe inyectar mimac.local: \(cmd)")
+        XCTAssertTrue(cmd.contains("--allowed-host \"test.com\""), "Debe inyectar test.com: \(cmd)")
+        XCTAssertTrue(cmd.contains("🛡️ Dominios:"), "El banner debe incluir la sección de dominios: \(cmd)")
+    }
 }
 
 /// Helper para capturar valores dentro de closures concurrentes en tests

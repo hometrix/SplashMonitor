@@ -8,6 +8,7 @@ public enum AppCategory: String, Codable, CaseIterable {
     case chatbot = "Chatbot / WebUI"
     case terminal = "Terminal / CLI"
     case customScript = "Script / Proceso"
+    case lanClient = "Cliente LAN"
     
     public var iconName: String {
         switch self {
@@ -16,6 +17,7 @@ public enum AppCategory: String, Codable, CaseIterable {
         case .chatbot: return "bubble.left.and.bubble.right.fill"
         case .terminal: return "terminal.fill"
         case .customScript: return "gearshape.2.fill"
+        case .lanClient: return "network"
         }
     }
     
@@ -26,6 +28,7 @@ public enum AppCategory: String, Codable, CaseIterable {
         case .chatbot: return isSpanish ? "Chatbot / Interfaz Gráfica" : "Chatbot / Graphical UI"
         case .terminal: return isSpanish ? "Terminal / Consola CLI" : "Terminal / CLI Console"
         case .customScript: return isSpanish ? "Script / Proceso Personalizado" : "Script / Custom Process"
+        case .lanClient: return isSpanish ? "Cliente Remoto / Red LAN" : "Remote Client / LAN Network"
         }
     }
 }

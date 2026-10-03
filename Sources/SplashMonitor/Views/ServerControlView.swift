@@ -225,8 +225,15 @@ public struct ServerControlView: View {
                     Text(tr(es: "Puerto Activo", en: "Active Port"))
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
-                    Text("\(service.activePort)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    HStack(spacing: 4) {
+                        Text("\(service.activePort)")
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        if service.listenOnAllInterfaces, let ip = service.localNetworkIP {
+                            Text("(LAN: \(ip))")
+                                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                .foregroundColor(.blue)
+                        }
+                    }
                 }
             }
             
@@ -410,7 +417,10 @@ public struct ServerControlView: View {
                         service.listenOnAllInterfaces = true
                     } label: {
                         HStack {
-                            Text(tr(es: "0.0.0.0 (Acceso LAN)", en: "0.0.0.0 (LAN Access)"))
+                            let label = service.localNetworkIP != nil
+                                ? tr(es: "0.0.0.0 (Acceso LAN: \(service.localNetworkIP!))", en: "0.0.0.0 (LAN: \(service.localNetworkIP!))")
+                                : tr(es: "0.0.0.0 (Acceso LAN)", en: "0.0.0.0 (LAN Access)")
+                            Text(label)
                             if service.listenOnAllInterfaces {
                                 Image(systemName: "checkmark")
                             }
@@ -421,7 +431,16 @@ public struct ServerControlView: View {
                         Image(systemName: service.listenOnAllInterfaces ? "network" : "lock.laptopcomputer")
                             .font(.system(size: 9))
                             .foregroundColor(service.listenOnAllInterfaces ? .blue : .secondary)
-                        Text(service.listenOnAllInterfaces ? "0.0.0.0 (LAN)" : "127.0.0.1")
+                        let hostText: String = {
+                            if service.listenOnAllInterfaces {
+                                if let ip = service.localNetworkIP {
+                                    return "0.0.0.0 (\(ip))"
+                                }
+                                return "0.0.0.0 (LAN)"
+                            }
+                            return "127.0.0.1"
+                        }()
+                        Text(hostText)
                             .font(.system(size: 10, design: .monospaced))
                     }
                 }
@@ -679,7 +698,8 @@ public struct ServerControlView: View {
             
             HStack(spacing: 8) {
                 Button {
-                    copyToClipboard("http://127.0.0.1:\(service.activePort)/v1")
+                    let host = service.preferredHostOrIP
+                    copyToClipboard("http://\(host):\(service.activePort)/v1")
                     showCopied(tr(es: "¡Copiado OpenAI URL!", en: "OpenAI URL copied!"))
                 } label: {
                     Label(tr(es: "Copiar OpenAI URL", en: "Copy OpenAI URL"), systemImage: "doc.on.doc")
@@ -689,7 +709,8 @@ public struct ServerControlView: View {
                 .controlSize(.small)
                 
                 Button {
-                    copyToClipboard("export OPENAI_BASE_URL=http://127.0.0.1:\(service.activePort)/v1\nexport ANTHROPIC_BASE_URL=http://127.0.0.1:\(service.activePort)")
+                    let host = service.preferredHostOrIP
+                    copyToClipboard("export OPENAI_BASE_URL=http://\(host):\(service.activePort)/v1\nexport ANTHROPIC_BASE_URL=http://\(host):\(service.activePort)")
                     showCopied(tr(es: "¡Copiado Env Vars!", en: "Env Vars copied!"))
                 } label: {
                     Label(tr(es: "Copiar Env Vars", en: "Copy Env Vars"), systemImage: "terminal")

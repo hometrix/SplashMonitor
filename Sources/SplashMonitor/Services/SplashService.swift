@@ -88,6 +88,32 @@ public class SplashService: ObservableObject {
     @AppStorage("lastUsedPort") public var lastUsedPort: Int = 8000
     @AppStorage("listenOnAllInterfaces") public var listenOnAllInterfaces: Bool = false
     @AppStorage("maxContext") public var maxContext: String = "auto"
+    @AppStorage("allowedHosts") public var allowedHosts: String = ""
+    
+    /// Dirección IPv4 primaria en la red de área local (ej. "192.168.1.49").
+    public var localNetworkIP: String? {
+        NetworkInterfaceHelper.primaryLocalIPv4()
+    }
+    
+    /// Host o IP preferida para clientes e integraciones según la configuración activa.
+    /// Si `listenOnAllInterfaces` está activo, prioriza el primer dominio permitido configurado
+    /// (ej. DDNS como midominio.duckdns.org) o la IP en la red LAN.
+    /// En caso contrario, devuelve `127.0.0.1`.
+    public var preferredHostOrIP: String {
+        if listenOnAllInterfaces {
+            let userHosts = allowedHosts
+                .components(separatedBy: CharacterSet(charactersIn: ",; \n\t"))
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if let primaryDomain = userHosts.first {
+                return primaryDomain
+            }
+            if let ip = localNetworkIP {
+                return ip
+            }
+        }
+        return "127.0.0.1"
+    }
     
     // Update check
     @Published public var hasUpdate: Bool = false
@@ -1092,8 +1118,29 @@ public class SplashService: ObservableObject {
             let modelAliases = ["claude-haiku-4-5", "claude-3-5-sonnet-latest", "claude-sonnet-4-5"]
             let aliasFlags = modelAliases.map { "--served-model-name \"\($0)\"" }.joined(separator: " ")
             
-            // Opciones de red y contexto (--host y --max-context)
+            // Opciones de red, allowed-hosts y contexto (--host, --allowed-host y --max-context)
             let hostFlag = self.listenOnAllInterfaces ? "--host \"0.0.0.0\"" : "--host \"127.0.0.1\""
+            
+            var allowedHostFlags = ""
+            var parsedAllowedHosts: [String] = []
+            if self.listenOnAllInterfaces {
+                let userHosts = self.allowedHosts
+                    .components(separatedBy: CharacterSet(charactersIn: ",; \n\t"))
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+                    .filter { !$0.isEmpty }
+                
+                let hostAllowedChars = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789.-_")
+                for host in userHosts where host.unicodeScalars.allSatisfy({ hostAllowedChars.contains($0) }) {
+                    if !parsedAllowedHosts.contains(host) {
+                        parsedAllowedHosts.append(host)
+                    }
+                }
+                
+                if !parsedAllowedHosts.isEmpty {
+                    allowedHostFlags = parsedAllowedHosts.map { "--allowed-host \"\($0)\"" }.joined(separator: " ")
+                }
+            }
+            
             var contextFlag = ""
             let trimmedContext = self.maxContext.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedContext.isEmpty && trimmedContext.lowercased() != "auto" {
@@ -1103,18 +1150,19 @@ public class SplashService: ObservableObject {
                 }
             }
             
-            let extraOptions = [hostFlag, contextFlag].filter { !$0.isEmpty }.joined(separator: " ")
+            let extraOptions = [hostFlag, allowedHostFlags, contextFlag].filter { !$0.isEmpty }.joined(separator: " ")
             let runCmd = "\"\(splashPath)\" serve --model \"\(validatedModel)\" --port \"\(port)\" \(extraOptions) \(aliasFlags)"
             
             let hostLabel = self.listenOnAllInterfaces ? "0.0.0.0 (Toda la red local / LAN)" : "127.0.0.1 (Solo localhost)"
             let contextLabel = (trimmedContext.isEmpty || trimmedContext.lowercased() == "auto") ? "Automático (por memoria)" : trimmedContext.uppercased()
+            let allowedHostsEcho = parsedAllowedHosts.isEmpty ? "" : "\necho \"🛡️ Dominios: \(parsedAllowedHosts.joined(separator: ", "))\""
             
             let cmd = """
             echo "🌊 ==============================================="
             echo "🚀 Iniciando Servidor Splash..."
             echo "📦 Modelo:   \(validatedModel)"
             echo "🔌 Puerto:   \(port)"
-            echo "🌐 Red/Host: \(hostLabel)"
+            echo "🌐 Red/Host: \(hostLabel)"\(allowedHostsEcho)
             echo "🧠 Contexto: \(contextLabel)"
             echo "⚡️ Motor:    \(splashPath)"
             echo "==============================================="
@@ -1497,15 +1545,35 @@ public class SplashService: ObservableObject {
         }.value
         
         var pidConnections: [Int32: (name: String, count: Int, remote: String)] = [:]
+        var lanConnections: [String: (count: Int, remote: String)] = [:]
+        let localLANIP = self.localNetworkIP
         
         // Parser puro y comprobado (`ListerOutput`) en lugar del bucle en línea.
         for connection in ListerOutput.establishedConnections(listing) {
             let pid = connection.pid
-            
-            // Skip server process itself
-            if let sPid = serverPid, Int32(sPid) == pid { continue }
-            
             let comm = connection.command
+            
+            let isServer = (serverPid != nil && Int32(serverPid!) == pid) || SplashEngineIdentity.isEngineCommand(comm)
+            
+            // Si la conexión pertenece al proceso del servidor Splash, inspeccionar si proviene de un cliente remoto de la LAN
+            if isServer {
+                let parts = connection.remoteAddress.components(separatedBy: "->")
+                let remoteTarget = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespacesAndNewlines) : ""
+                let remoteIP = remoteTarget.components(separatedBy: ":").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                
+                if !remoteIP.isEmpty &&
+                   remoteIP != "127.0.0.1" &&
+                   remoteIP != "::1" &&
+                   remoteIP != "localhost" &&
+                   remoteIP != localLANIP {
+                    if let existing = lanConnections[remoteIP] {
+                        lanConnections[remoteIP] = (count: existing.count + 1, remote: remoteTarget)
+                    } else {
+                        lanConnections[remoteIP] = (count: 1, remote: remoteTarget)
+                    }
+                }
+                continue
+            }
             
             // Filter out Splash's internal engine or python if under a different PID
             if comm.localizedCaseInsensitiveContains("splash") && !comm.localizedCaseInsensitiveContains("claude") {
@@ -1520,6 +1588,25 @@ public class SplashService: ObservableObject {
         }
         
         var detected: [ConnectedApp] = []
+        
+        // Clientes remotos conectados a través de la red de área local (LAN)
+        for (remoteIP, info) in lanConnections {
+            let syntheticPid = Int32(abs(remoteIP.hashValue % 100000) + 900000)
+            let app = ConnectedApp(
+                pid: syntheticPid,
+                name: "Cliente LAN (\(remoteIP))",
+                bundleId: nil,
+                executablePath: nil,
+                category: .lanClient,
+                icon: NSImage(systemSymbolName: "network", accessibilityDescription: "LAN"),
+                connectionCount: info.count,
+                status: .active,
+                firstConnected: Date(),
+                lastSeen: Date(),
+                remoteAddress: info.remote
+            )
+            detected.append(app)
+        }
         
         for (pid, info) in pidConnections {
             let runningApp = NSRunningApplication(processIdentifier: pid)
