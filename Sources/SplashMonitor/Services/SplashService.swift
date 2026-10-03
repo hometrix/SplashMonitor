@@ -1115,7 +1115,35 @@ public class SplashService: ObservableObject {
             await killSplashProcesses(port: port)
             
             let splashPath = self.splashExecutablePath
-            let modelAliases = ["claude-haiku-4-5", "claude-3-5-sonnet-latest", "claude-sonnet-4-5"]
+            
+            // Aliases de modelos Anthropic para Claude Desktop (Cowork, Code/Codex, Claude Code CLI)
+            let modelAliases = [
+                // Familia Sonnet (Pestaña Code / CCD y Cowork)
+                "claude-sonnet-4-6",
+                "claude-sonnet-5",
+                "claude-sonnet-5-5",
+                "claude-sonnet-4-5",
+                "claude-3-7-sonnet-latest",
+                "claude-3-7-sonnet-20250219",
+                "claude-3-5-sonnet-latest",
+                "claude-3-5-sonnet-20241022",
+                "claude-3-5-sonnet-20240620",
+                // Familia Haiku
+                "claude-haiku-4-5",
+                "claude-haiku-4-5-20251001",
+                "claude-3-5-haiku-latest",
+                "claude-3-5-haiku-20241022",
+                "claude-3-haiku-20240307",
+                // Familia Opus
+                "claude-opus-4-7",
+                "claude-opus-5",
+                "claude-opus-5-5",
+                "claude-3-opus-latest",
+                "claude-3-opus-20240229",
+                // Familia Fable
+                "claude-fable-5",
+                "claude-fable-5-1"
+            ]
             let aliasFlags = modelAliases.map { "--served-model-name \"\($0)\"" }.joined(separator: " ")
             
             // Opciones de red, allowed-hosts y contexto (--host, --allowed-host y --max-context)

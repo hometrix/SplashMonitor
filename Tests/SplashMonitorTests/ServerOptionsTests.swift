@@ -154,6 +154,26 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(cmd.contains("--allowed-host \"test.com\""), "Debe inyectar test.com: \(cmd)")
         XCTAssertTrue(cmd.contains("🛡️ Dominios:"), "El banner debe incluir la sección de dominios: \(cmd)")
     }
+    
+    func testServerLaunchInjectsClaudeCodeAndCoworkModelAliases() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmd = capturedCommand.value else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        // Verifica que se inyectan los alias requeridos por la pestaña Code (Codex / CCD)
+        XCTAssertTrue(cmd.contains("--served-model-name \"claude-sonnet-4-6\""), "Debe inyectar claude-sonnet-4-6 para la pestaña Code: \(cmd)")
+        XCTAssertTrue(cmd.contains("--served-model-name \"claude-sonnet-5\""), "Debe inyectar claude-sonnet-5: \(cmd)")
+        XCTAssertTrue(cmd.contains("--served-model-name \"claude-haiku-4-5-20251001\""), "Debe inyectar haiku-4-5-20251001: \(cmd)")
+        XCTAssertTrue(cmd.contains("--served-model-name \"claude-3-7-sonnet-20250219\""), "Debe inyectar 3-7-sonnet: \(cmd)")
+        XCTAssertTrue(cmd.contains("--served-model-name \"claude-sonnet-4-5\""), "Debe inyectar sonnet-4-5 para Cowork: \(cmd)")
+    }
 }
 
 /// Helper para capturar valores dentro de closures concurrentes en tests
