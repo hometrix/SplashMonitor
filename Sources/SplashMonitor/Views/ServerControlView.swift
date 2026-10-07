@@ -368,241 +368,274 @@ public struct ServerControlView: View {
                 }
             }
             
-            // Port input configuration
-            HStack(spacing: 8) {
-                Text(tr(es: "Puerto:", en: "Port:"))
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary)
-                
-                TextField("8000", text: $portString)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 11, design: .monospaced))
-                    .frame(width: 65)
-                
-                Button {
-                    let suggested = service.findSuggestedFreePort()
-                    portString = "\(suggested)"
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "sparkles")
-                        Text(tr(es: "Sugerir libre", en: "Suggest free"))
-                    }
-                    .font(.system(size: 10))
-                }
-                .buttonStyle(.borderless)
-                .foregroundColor(.blue)
-                .help(tr(es: "Escanear y sugerir automáticamente un puerto libre en tu sistema", en: "Scan and automatically suggest a free port on your system"))
-                
-                if let p = Int(portString) {
-                    if service.isPortListening(port: p) && (!service.isRunning || p != service.activePort) {
-                        HStack(spacing: 3) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .font(.system(size: 9))
-                                .foregroundColor(.orange)
-                            Text(tr(es: "En uso", en: "In use"))
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.orange)
-                        }
-                    } else {
-                        HStack(spacing: 3) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 9))
-                                .foregroundColor(.green)
-                            Text(tr(es: "Libre", en: "Free"))
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(.green)
-                        }
-                    }
-                }
-                
-                Divider()
-                    .frame(height: 14)
-                
-                // Selector de Host / Red (127.0.0.1 vs 0.0.0.0)
-                Menu {
+            // Configuration Rows: Row 1 (Network & Port) & Row 2 (Inference Options & Action)
+            VStack(spacing: 9) {
+                // Fila 1: Puerto y Configuración de Red / Host
+                HStack(spacing: 8) {
+                    Text(tr(es: "Puerto:", en: "Port:"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                    
+                    TextField("8000", text: $portString)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11, design: .monospaced))
+                        .frame(width: 65)
+                    
                     Button {
-                        service.listenOnAllInterfaces = false
+                        let suggested = service.findSuggestedFreePort()
+                        portString = "\(suggested)"
                     } label: {
-                        HStack {
-                            Text("127.0.0.1 (Localhost)")
-                            if !service.listenOnAllInterfaces {
-                                Image(systemName: "checkmark")
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                            Text(tr(es: "Sugerir libre", en: "Suggest free"))
+                                .lineLimit(1)
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.blue)
+                    .fixedSize()
+                    .help(tr(es: "Escanear y sugerir automáticamente un puerto libre en tu sistema", en: "Scan and automatically suggest a free port on your system"))
+                    
+                    if let p = Int(portString) {
+                        if service.isPortListening(port: p) && (!service.isRunning || p != service.activePort) {
+                            HStack(spacing: 3) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.orange)
+                                Text(tr(es: "En uso", en: "In use"))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.orange)
+                                    .lineLimit(1)
                             }
+                            .fixedSize()
+                        } else {
+                            HStack(spacing: 3) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.green)
+                                Text(tr(es: "Libre", en: "Free"))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(.green)
+                                    .lineLimit(1)
+                            }
+                            .fixedSize()
                         }
                     }
-                    Button {
-                        service.listenOnAllInterfaces = true
-                    } label: {
-                        HStack {
-                            let label = service.localNetworkIP != nil
-                                ? tr(es: "0.0.0.0 (Acceso LAN: \(service.localNetworkIP!))", en: "0.0.0.0 (LAN: \(service.localNetworkIP!))")
-                                : tr(es: "0.0.0.0 (Acceso LAN)", en: "0.0.0.0 (LAN Access)")
-                            Text(label)
-                            if service.listenOnAllInterfaces {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: service.listenOnAllInterfaces ? "network" : "lock.laptopcomputer")
-                            .font(.system(size: 9))
-                            .foregroundColor(service.listenOnAllInterfaces ? .blue : .secondary)
-                        let hostText: String = {
-                            if service.listenOnAllInterfaces {
-                                if let ip = service.localNetworkIP {
-                                    return "0.0.0.0 (\(ip))"
-                                }
-                                return "0.0.0.0 (LAN)"
-                            }
-                            return "127.0.0.1"
-                        }()
-                        Text(hostText)
-                            .font(.system(size: 10, design: .monospaced))
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help(tr(
-                    es: "127.0.0.1 solo acepta conexiones en este Mac. 0.0.0.0 expone el servidor a tu red local (LAN) para que otros equipos puedan conectarse.",
-                    en: "127.0.0.1 only accepts connections from this Mac. 0.0.0.0 exposes the server to your local network (LAN) for other devices to connect."
-                ))
-                
-                Divider()
-                    .frame(height: 14)
-                
-                // Selector de Contexto Máximo (--max-context)
-                Menu {
-                    Button {
-                        service.maxContext = "auto"
-                    } label: {
-                        HStack {
-                            Text(tr(es: "Automático (por memoria)", en: "Auto (by memory)"))
-                            if service.maxContext == "auto" {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                    Divider()
-                    ForEach(["16K", "32K", "64K", "128K", "256K"], id: \.self) { ctx in
+                    
+                    Spacer()
+                    
+                    // Selector de Host / Red (127.0.0.1 vs 0.0.0.0)
+                    Menu {
                         Button {
-                            service.maxContext = ctx
+                            service.listenOnAllInterfaces = false
                         } label: {
                             HStack {
-                                Text("\(ctx) tokens")
-                                if service.maxContext == ctx {
+                                Text("127.0.0.1 (Localhost)")
+                                if !service.listenOnAllInterfaces {
                                     Image(systemName: "checkmark")
                                 }
                             }
                         }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 9))
-                            .foregroundColor(.purple)
-                        Text(service.maxContext == "auto" ? "Ctx: Auto" : "Ctx: \(service.maxContext)")
-                            .font(.system(size: 10, design: .monospaced))
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help(tr(
-                    es: "Límite máximo de tokens de contexto (--max-context) para la inferencia de Splash.",
-                    en: "Maximum context token limit (--max-context) for Splash inference."
-                ))
-                
-                Divider()
-                    .frame(height: 14)
-                
-                // Selector de Modalidad (Visión vs Solo Texto / --language-only)
-                Menu {
-                    Button {
-                        service.languageOnly = false
-                    } label: {
-                        HStack {
-                            Text(tr(es: "👁️ Visión + Texto (Normal)", en: "👁️ Vision + Text (Standard)"))
-                            if !service.languageOnly {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                    Button {
-                        service.languageOnly = true
-                    } label: {
-                        HStack {
-                            Text(tr(es: "📝 Solo Texto / Código (--language-only)", en: "📝 Text / Code Only (--language-only)"))
-                            if service.languageOnly {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: service.languageOnly ? "doc.text" : "eye")
-                            .font(.system(size: 9))
-                            .foregroundColor(service.languageOnly ? .orange : .teal)
-                        Text(service.languageOnly ? tr(es: "Solo Texto", en: "Text Only") : tr(es: "Visión", en: "Vision"))
-                            .font(.system(size: 10, design: .monospaced))
-                    }
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-                .help(tr(
-                    es: "Configura si Splash debe inicializar soporte multimodal de imágenes o modo solo texto (--language-only, requerido para modelos Coder sin proyector mmproj).",
-                    en: "Configures whether Splash should initialize multimodal image support or text-only mode (--language-only, required for Coder models without mmproj projectors)."
-                ))
-                
-                Spacer()
-                
-                let targetModel = isCustomModel ? customModelText.trimmingCharacters(in: .whitespacesAndNewlines) : service.selectedModelForLaunch
-                let targetPort = Int(portString) ?? service.activePort
-                let isSameAsActive = (targetModel == service.activeModel && service.isRunning)
-                
-                if service.isStartingServer {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(tr(es: "Iniciando Servidor...", en: "Starting Server..."))
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.green.opacity(0.15))
-                    .cornerRadius(6)
-                } else if service.isRunning {
-                    if isSameAsActive {
                         Button {
-                            service.switchModel(to: targetModel)
+                            service.listenOnAllInterfaces = true
                         } label: {
-                            Label(tr(es: "Reiniciar", en: "Restart"), systemImage: "arrow.clockwise")
-                                .font(.system(size: 11))
+                            HStack {
+                                let label = service.localNetworkIP != nil
+                                    ? tr(es: "0.0.0.0 (Acceso LAN: \(service.localNetworkIP!))", en: "0.0.0.0 (LAN: \(service.localNetworkIP!))")
+                                    : tr(es: "0.0.0.0 (Acceso LAN)", en: "0.0.0.0 (LAN Access)")
+                                Text(label)
+                                if service.listenOnAllInterfaces {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.regular)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: service.listenOnAllInterfaces ? "network" : "lock.laptopcomputer")
+                                .font(.system(size: 10))
+                                .foregroundColor(service.listenOnAllInterfaces ? .blue : .secondary)
+                            let hostText: String = {
+                                if service.listenOnAllInterfaces {
+                                    if let ip = service.localNetworkIP {
+                                        return "0.0.0.0 (\(ip))"
+                                    }
+                                    return "0.0.0.0 (LAN)"
+                                }
+                                return "127.0.0.1 (Localhost)"
+                            }()
+                            Text(hostText)
+                                .font(.system(size: 10, design: .monospaced))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.08))
+                        .cornerRadius(5)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help(tr(
+                        es: "127.0.0.1 solo acepta conexiones en este Mac. 0.0.0.0 expone el servidor a tu red local (LAN) para que otros equipos puedan conectarse.",
+                        en: "127.0.0.1 only accepts connections from this Mac. 0.0.0.0 exposes the server to your local network (LAN) for other devices to connect."
+                    ))
+                }
+                
+                // Fila 2: Modalidad, Contexto Máximo y Botón de Acción Principal
+                HStack(spacing: 8) {
+                    // Selector de Contexto Máximo (--max-context)
+                    Menu {
+                        Button {
+                            service.maxContext = "auto"
+                        } label: {
+                            HStack {
+                                Text(tr(es: "Automático (por memoria)", en: "Auto (by memory)"))
+                                if service.maxContext == "auto" {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        Divider()
+                        ForEach(["16K", "32K", "64K", "128K", "256K"], id: \.self) { ctx in
+                            Button {
+                                service.maxContext = ctx
+                            } label: {
+                                HStack {
+                                    Text("\(ctx) tokens")
+                                    if service.maxContext == ctx {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "brain.head.profile")
+                                .font(.system(size: 10))
+                                .foregroundColor(.purple)
+                            Text(service.maxContext == "auto" ? "Ctx: Auto" : "Ctx: \(service.maxContext)")
+                                .font(.system(size: 10, design: .monospaced))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.08))
+                        .cornerRadius(5)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help(tr(
+                        es: "Límite máximo de tokens de contexto (--max-context) para la inferencia de Splash.",
+                        en: "Maximum context token limit (--max-context) for Splash inference."
+                    ))
+                    
+                    Divider()
+                        .frame(height: 14)
+                    
+                    // Selector de Modalidad (Visión vs Solo Texto / --language-only)
+                    Menu {
+                        Button {
+                            service.languageOnly = false
+                        } label: {
+                            HStack {
+                                Text(tr(es: "👁️ Visión + Texto (Normal)", en: "👁️ Vision + Text (Standard)"))
+                                if !service.languageOnly {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        Button {
+                            service.languageOnly = true
+                        } label: {
+                            HStack {
+                                Text(tr(es: "📝 Solo Texto / Código (--language-only)", en: "📝 Text / Code Only (--language-only)"))
+                                if service.languageOnly {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: service.languageOnly ? "doc.text" : "eye")
+                                .font(.system(size: 10))
+                                .foregroundColor(service.languageOnly ? .orange : .teal)
+                            Text(service.languageOnly ? tr(es: "Solo Texto", en: "Text Only") : tr(es: "Visión", en: "Vision"))
+                                .font(.system(size: 10, design: .monospaced))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.08))
+                        .cornerRadius(5)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .help(tr(
+                        es: "Configura si Splash debe inicializar soporte multimodal de imágenes o modo solo texto (--language-only, requerido para modelos Coder sin proyector mmproj).",
+                        en: "Configures whether Splash should initialize multimodal image support or text-only mode (--language-only, required for Coder models without mmproj projectors)."
+                    ))
+                    
+                    Spacer()
+                    
+                    let targetModel = isCustomModel ? customModelText.trimmingCharacters(in: .whitespacesAndNewlines) : service.selectedModelForLaunch
+                    let targetPort = Int(portString) ?? service.activePort
+                    let isSameAsActive = (targetModel == service.activeModel && service.isRunning)
+                    
+                    if service.isStartingServer {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text(tr(es: "Iniciando Servidor...", en: "Starting Server..."))
+                                .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.green.opacity(0.15))
+                        .cornerRadius(6)
+                        .fixedSize()
+                    } else if service.isRunning {
+                        if isSameAsActive {
+                            Button {
+                                service.switchModel(to: targetModel)
+                            } label: {
+                                Label(tr(es: "Reiniciar", en: "Restart"), systemImage: "arrow.clockwise")
+                                    .font(.system(size: 11))
+                                    .lineLimit(1)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .fixedSize()
+                        } else {
+                            Button {
+                                service.startServer(model: targetModel, port: targetPort)
+                            } label: {
+                                Label(tr(es: "Cambiar Modelo", en: "Switch Model"), systemImage: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .lineLimit(1)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.purple)
+                            .controlSize(.regular)
+                            .disabled(targetModel.isEmpty || customModelError != nil)
+                            .fixedSize()
+                        }
                     } else {
                         Button {
                             service.startServer(model: targetModel, port: targetPort)
                         } label: {
-                            Label(tr(es: "Cambiar Modelo", en: "Switch Model"), systemImage: "arrow.triangle.2.circlepath")
+                            Label(tr(es: "Arrancar Servidor", en: "Start Server"), systemImage: "play.fill")
                                 .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(.purple)
+                        .tint(.green)
                         .controlSize(.regular)
-                        .disabled(targetModel.isEmpty || customModelError != nil)
+                        .disabled(targetModel.isEmpty)
+                        .fixedSize()
                     }
-                } else {
-                    Button {
-                        service.startServer(model: targetModel, port: targetPort)
-                    } label: {
-                        Label(tr(es: "Arrancar Servidor", en: "Start Server"), systemImage: "play.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    .controlSize(.regular)
-                    .disabled(targetModel.isEmpty)
                 }
             }
             
