@@ -5,6 +5,35 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.6-beta] - 2026-10-07
+
+Versión mayor de pruebas y observabilidad que incorpora el **Laboratorio de Test de Modelos**,
+soporte completo para arquitecturas con razonamiento profundo (*thinking models* como Qwen, DeepSeek y Tiel-Coder),
+soporte de variantes GGUF cuantizadas (`:UD-Q4_K_XL`) y modo de ejecución solo lenguaje (`--language-only`).
+
+### 🚀 Novedades y Características
+
+- **Nuevo Módulo: Test y Diagnóstico de Modelos (`Test de Modelos`):**
+  - **Smoke Test Completo (7 endpoints):** Validación integral y en tiempo real de la pila de Splash:
+    - `Salud del Servidor (GET /health)`: Comprobación de estado y latencia HTTP.
+    - `Disponibilidad del Motor Metal (GET /ready)`: Verificación del pipeline Metal acelerado por hardware Apple Silicon.
+    - `Capacidades y Contexto (GET /status)`: Verificación de longitud máxima de contexto y soporte multimodal de visión.
+    - `Plantilla Jinja y Tokenizador (POST /apply-template)`: Validación del formateo de prompts y delimitadores de chat.
+    - `Inferencia OpenAI Chat (POST /v1/chat/completions)`: Canary test con medición de latencia.
+    - `Compatibilidad Anthropic (POST /v1/messages)`: Prueba del gateway nativo de Claude Messages.
+    - `Llamada de Funciones (Tool Calling / JSON)`: Validación de generación estructurada con esquema de herramientas (`get_current_weather`).
+  - **Benchmark y Reutilización de Caché:** Medición precisa de *Time to First Token* (TTFT), velocidad de generación en tokens/segundo con aceleración Metal y evaluación empírica de ahorro de latencia gracias a la reutilización de prefijos de contexto (*Prompt Caching*).
+  - **Playground Interactivo:** Consola interactiva para realizar consultas rápidas en vivo con alternador de API (OpenAI / Anthropic), medición de tok/s y visualización dual de cadenas de razonamiento (`reasoning_content`) y respuesta generada (`content`).
+- **Soporte Oficial de Variantes de Cuantización GGUF (`OWNER/REPO:VARIANT`):** `ModelIDValidator` ahora admite modelos con variantes explícitas (ej. `peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL`, `:UD-Q4_K_M`, etc.), permitiendo instalar, validar y arrancar cualquier cuantización avanzada de la comunidad.
+- **Soporte y Respaldo Automático Solo Lenguaje (`--language-only`):** Control visual y rescate automático para modelos de programación o texto que no cuentan con proyector de visión `mmproj-F16.gguf`, evitando los errores de salida código 2 de Splash.
+- **Mapeo Avanzado de Aliases para Claude Desktop y Cowork:** Registro automático de nombres de sondeo de modelo (`--served-model-name`) para permitir conexión transparente de la pestaña Code y Cowork en Claude for Mac.
+- **Diseño Responsivo en Controles del Servidor:** Reorganización de las opciones del motor (Puerto, Enlace LAN, Límite de Contexto, Modo Lenguaje) en dos filas adaptativas con badges informativos.
+
+### 🐛 Correcciones y Optimizaciones
+
+- **Manejo de Modelos con Razonamiento Profundo (OpenAI Chat):** Corrección en el parser de inferencia que fallaba en modelos como `Tiel-Coder` cuando agotaban `max_tokens` dentro de `reasoning_tokens` retornando `content: null`. Se inyecta `reasoning_effort: "none"` en pruebas rápidas y se extrae `reasoning_content` como fallback válido.
+- **Red de Pruebas Ampliada:** 87 pruebas automatizadas pasando al 100% (0 fallos).
+
 ## [1.0.5-beta] - 2026-10-02
 
 Versión enfocada en la conectividad en red local (LAN) y dominios remotos/DDNS,

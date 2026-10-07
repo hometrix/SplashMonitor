@@ -9,13 +9,13 @@ import Foundation
 /// duplicada en 5 lugares (servicio, Info.plist, DMG, instalador y README) y ya había
 /// divergido: el README anunciaba 1.0.0-beta mientras el binario compilaba 1.0.2-beta.
 public enum SplashVersion {
-    public static let current = "1.0.5-beta"
+    public static let current = "1.0.6-beta"
     /// Identificador de paquete propio (P-11). Antes el proyecto se anunciaba como
     /// `com.incoai.splashmonitor`, reclamando el espacio de nombres de IncoAI, del que
     /// este monitor es software independiente.
     public static let bundleIdentifier = "do.jmgrep.splashmonitor"
     /// Número de compilación para `CFBundleVersion` (debe crecer con cada publicación).
-    public static let buildNumber = "6"
+    public static let buildNumber = "7"
 }
 
 // MARK: - Comparación semántica de versiones (P-07 / H-08)

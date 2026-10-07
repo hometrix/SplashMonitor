@@ -10,7 +10,7 @@ set -euo pipefail
 
 REPO="hometrix/SplashMonitor"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
-TAG_FALLBACK="v1.0.4-beta"
+TAG_FALLBACK="v1.0.6-beta"
 TEMP_DMG="/tmp/SplashMonitor-installer-$$.dmg"
 CHECKSUM_FILE="/tmp/SplashMonitor-SHA256SUMS-$$"
 MOUNT_DIR="/tmp/SplashMonitor-mount-$$"
