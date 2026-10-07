@@ -9,6 +9,7 @@ final class AgentLaunchTests: XCTestCase {
         XCTAssertTrue(SplashService.supportedAgents.contains("opencode"))
         XCTAssertTrue(SplashService.supportedAgents.contains("codex"))
         XCTAssertTrue(SplashService.supportedAgents.contains("hermes"))
+        XCTAssertTrue(SplashService.supportedAgents.contains("chatgpt"), "supportedAgents debe incluir 'chatgpt'")
     }
     
     @MainActor
@@ -19,9 +20,22 @@ final class AgentLaunchTests: XCTestCase {
     }
     
     @MainActor
+    func testAgentInstallURLForChatGPT() {
+        let service = SplashService()
+        let url = service.agentInstallURL(agent: "chatgpt")
+        XCTAssertEqual(url.absoluteString, "https://openai.com/chatgpt/download/")
+    }
+    
+    @MainActor
     func testIsAgentInstalledDoesNotCrashForClaudeCowork() {
         let service = SplashService()
         // No debe lanzar excepciones ni provocar cuelgues
         _ = service.isAgentInstalled(agent: "claude-cowork")
+    }
+    
+    @MainActor
+    func testIsAgentInstalledDoesNotCrashForChatGPT() {
+        let service = SplashService()
+        _ = service.isAgentInstalled(agent: "chatgpt")
     }
 }

@@ -80,15 +80,15 @@ public struct ServerControlView: View {
                 let url = service.agentInstallURL(agent: pendingAgentCommand)
                 NSWorkspace.shared.open(url)
             }
-            Button(tr(es: pendingAgentCommand == "claude-cowork" ? "Abrir Claude de Todos Modos" : "Lanzar en Terminal de Todos Modos",
-                      en: pendingAgentCommand == "claude-cowork" ? "Open Claude Anyway" : "Launch in Terminal Anyway")) {
+            Button(tr(es: pendingAgentCommand == "claude-cowork" ? "Abrir Claude de Todos Modos" : (pendingAgentCommand == "chatgpt" ? "Abrir ChatGPT de Todos Modos" : "Lanzar en Terminal de Todos Modos"),
+                      en: pendingAgentCommand == "claude-cowork" ? "Open Claude Anyway" : (pendingAgentCommand == "chatgpt" ? "Open ChatGPT Anyway" : "Launch in Terminal Anyway"))) {
                 service.launchAgent(agent: pendingAgentCommand)
             }
             Button(tr(es: "Cancelar", en: "Cancel"), role: .cancel) {}
         } message: {
             Text(tr(
-                es: pendingAgentCommand == "claude-cowork" ? "No se detectó la aplicación Claude for Mac en tu sistema (/Applications/Claude.app). Puedes descargarla desde la web oficial de Claude." : "No se detectó el comando '\(pendingAgentCommand)' en tu sistema. Puedes instalarlo siguiendo la guía oficial.",
-                en: pendingAgentCommand == "claude-cowork" ? "Claude for Mac application was not detected on your system (/Applications/Claude.app). You can download it from the official Claude website." : "Command '\(pendingAgentCommand)' was not detected on your system. You can install it following the official guide."
+                es: pendingAgentCommand == "claude-cowork" ? "No se detectó la aplicación Claude for Mac en tu sistema (/Applications/Claude.app). Puedes descargarla desde la web oficial de Claude." : (pendingAgentCommand == "chatgpt" ? "No se detectó la aplicación ChatGPT for Mac en tu sistema (/Applications/ChatGPT.app). Puedes descargarla desde la web oficial de OpenAI." : "No se detectó el comando '\(pendingAgentCommand)' en tu sistema. Puedes instalarlo siguiendo la guía oficial."),
+                en: pendingAgentCommand == "claude-cowork" ? "Claude for Mac application was not detected on your system (/Applications/Claude.app). You can download it from the official Claude website." : (pendingAgentCommand == "chatgpt" ? "ChatGPT for Mac application was not detected on your system (/Applications/ChatGPT.app). You can download it from the official OpenAI website." : "Command '\(pendingAgentCommand)' was not detected on your system. You can install it following the official guide.")
             ))
         }
         .alert(
@@ -719,6 +719,17 @@ public struct ServerControlView: View {
                     isServerRunning: service.isRunning
                 ) {
                     handleAgentLaunch(name: "Claude Cowork", command: "claude-cowork")
+                }
+                
+                AgentButton(
+                    name: "ChatGPT Desktop",
+                    icon: "sparkles",
+                    command: "chatgpt",
+                    subtitle: "Codex & OWL (macOS)",
+                    isInstalled: service.isAgentInstalled(agent: "chatgpt"),
+                    isServerRunning: service.isRunning
+                ) {
+                    handleAgentLaunch(name: "ChatGPT Desktop", command: "chatgpt")
                 }
                 
                 AgentButton(

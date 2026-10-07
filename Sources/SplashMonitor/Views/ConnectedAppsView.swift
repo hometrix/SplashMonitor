@@ -332,6 +332,22 @@ public struct ConnectedAppsView: View {
                 )
                 
                 IntegrationGuideCard(
+                    title: "ChatGPT Desktop / Codex",
+                    subtitle: tr(es: "App nativa OpenAI para macOS", en: "OpenAI macOS native App"),
+                    icon: "sparkles",
+                    badge: "OpenAI / Codex",
+                    color: .teal,
+                    steps: [
+                        tr(es: "1. En ChatGPT for Mac o scripts Codex, apunta a tu endpoint:", en: "1. In ChatGPT for Mac or Codex scripts, point to your endpoint:"),
+                        "http://\(host):\(service.activePort)/v1",
+                        tr(es: "2. Modelo activo en Splash:", en: "2. Active model in Splash:"),
+                        service.activeModel.isEmpty ? "incoai/Qwen3.8-27B-Splash" : service.activeModel,
+                        tr(es: "3. API Key: 'splash' (token de bypass)", en: "3. API Key: 'splash' (bypass token)")
+                    ],
+                    copyText: "http://\(host):\(service.activePort)/v1"
+                )
+                
+                IntegrationGuideCard(
                     title: "Chatbox / NextChat / WebUI",
                     subtitle: tr(es: "Interfaces de Chatbot para macOS", en: "macOS Chatbot Interfaces"),
                     icon: "bubble.left.and.bubble.right.fill",

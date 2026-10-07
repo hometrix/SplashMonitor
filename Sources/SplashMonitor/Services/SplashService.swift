@@ -1415,6 +1415,12 @@ public class SplashService: ObservableObject {
                 || FileManager.default.fileExists(atPath: "/Applications/Claude.app")
                 || FileManager.default.fileExists(atPath: "\(home)/Applications/Claude.app")
         }
+        if agent == "chatgpt" {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            return installedAgents.contains("chatgpt")
+                || FileManager.default.fileExists(atPath: "/Applications/ChatGPT.app")
+                || FileManager.default.fileExists(atPath: "\(home)/Applications/ChatGPT.app")
+        }
         return installedAgents.contains(agent)
     }
     
@@ -1443,6 +1449,11 @@ public class SplashService: ObservableObject {
                FileManager.default.fileExists(atPath: "\(home)/Applications/Claude.app") {
                 found.insert("claude-cowork")
             }
+            // Detección de ChatGPT Desktop / Codex en macOS
+            if FileManager.default.fileExists(atPath: "/Applications/ChatGPT.app") ||
+               FileManager.default.fileExists(atPath: "\(home)/Applications/ChatGPT.app") {
+                found.insert("chatgpt")
+            }
             let result = found
             await MainActor.run {
                 self.installedAgents = result
@@ -1456,6 +1467,8 @@ public class SplashService: ObservableObject {
             return URL(string: "https://code.claude.com/docs/en/overview")!
         case "claude-cowork":
             return URL(string: "https://claude.ai/download")!
+        case "chatgpt":
+            return URL(string: "https://openai.com/chatgpt/download/")!
         case "opencode":
             return URL(string: "https://opencode.ai/docs/")!
         case "codex":
@@ -1467,8 +1480,8 @@ public class SplashService: ObservableObject {
         }
     }
     
-    /// Agentes que el motor sabe lanzar (`splash <agente>` o app nativa para cowork).
-    public static let supportedAgents = ["claude", "claude-cowork", "opencode", "codex", "hermes"]
+    /// Agentes que el motor sabe lanzar (`splash <agente>` o app nativa para cowork/chatgpt).
+    public static let supportedAgents = ["claude", "claude-cowork", "opencode", "codex", "hermes", "chatgpt"]
     
     public func launchAgent(agent: String) {
         guard isSplashInstalled else {
@@ -1501,6 +1514,30 @@ public class SplashService: ObservableObject {
                 }
             } else {
                 _ = CommandRunner.run("/usr/bin/open", ["-a", "Claude"])
+            }
+            return
+        }
+        
+        // Manejo específico para ChatGPT Desktop / Codex (App GUI macOS)
+        if agent == "chatgpt" {
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            let appURL = [
+                URL(fileURLWithPath: "/Applications/ChatGPT.app"),
+                URL(fileURLWithPath: "\(home)/Applications/ChatGPT.app")
+            ].first(where: { FileManager.default.fileExists(atPath: $0.path) })
+            
+            if let targetURL = appURL {
+                let config = NSWorkspace.OpenConfiguration()
+                config.activates = true
+                NSWorkspace.shared.openApplication(at: targetURL, configuration: config) { _, error in
+                    if let error = error {
+                        Task { @MainActor in
+                            self.lastError = "Error al abrir ChatGPT: \(error.localizedDescription)"
+                        }
+                    }
+                }
+            } else {
+                _ = CommandRunner.run("/usr/bin/open", ["-a", "ChatGPT"])
             }
             return
         }
@@ -1696,6 +1733,9 @@ public class SplashService: ObservableObject {
             
             if bundleId == "com.anthropic.claudefordesktop" || (lowerName == "claude" && execPath?.contains("Claude.app") == true) {
                 appName = "Claude Desktop / Cowork"
+                category = .codingAgent
+            } else if bundleId == "com.openai.codex" || bundleId == "com.openai.chat" || lowerName == "chatgpt" || execPath?.contains("ChatGPT.app") == true {
+                appName = "ChatGPT Desktop (Codex)"
                 category = .codingAgent
             } else if lowerName.contains("cursor") || lowerName.contains("code") || lowerName.contains("xcode") || lowerName.contains("zed") || lowerName.contains("studio") || lowerName.contains("intellij") || lowerName.contains("pycharm") {
                 category = .ide
