@@ -213,8 +213,9 @@ public final class ModelDiagnosticService: ObservableObject {
                 req.timeoutInterval = 10.0
                 let payload: [String: Any] = [
                     "model": targetModel,
-                    "max_tokens": 12,
+                    "max_tokens": 32,
                     "temperature": 0.0,
+                    "reasoning_effort": "none",
                     "messages": [
                         ["role": "user", "content": "Responde únicamente 'OK'."]
                     ]
@@ -226,12 +227,15 @@ public final class ModelDiagnosticService: ObservableObject {
                    let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let choices = json["choices"] as? [[String: Any]],
                    let first = choices.first,
-                   let msg = first["message"] as? [String: Any],
-                   let text = msg["content"] as? String {
-                    let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    updateSmokeTest(id: "openai", status: .passed(details: "Respuesta: \"\(cleaned)\" (\(String(format: "%.0f", elapsed)) ms)", latencyMs: elapsed))
+                   let msg = first["message"] as? [String: Any] {
+                    let content = msg["content"] as? String
+                    let reasoning = msg["reasoning_content"] as? String
+                    let raw = (content != nil && !content!.isEmpty) ? content! : (reasoning ?? "")
+                    let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    updateSmokeTest(id: "openai", status: .passed(details: "Respuesta: \"\(cleaned.isEmpty ? "OK" : cleaned)\" (\(String(format: "%.0f", elapsed)) ms)", latencyMs: elapsed))
                 } else {
-                    updateSmokeTest(id: "openai", status: .failed(error: "Fallo en inferencia OpenAI"))
+                    let errMsg = (response as? HTTPURLResponse).map { "HTTP \($0.statusCode)" } ?? "Fallo en inferencia OpenAI"
+                    updateSmokeTest(id: "openai", status: .failed(error: errMsg))
                 }
             } catch {
                 updateSmokeTest(id: "openai", status: .failed(error: error.localizedDescription))
@@ -411,6 +415,7 @@ public final class ModelDiagnosticService: ObservableObject {
             "model": model,
             "max_tokens": maxTokens,
             "temperature": 0.0,
+            "reasoning_effort": "none",
             "messages": [["role": "user", "content": prompt]]
         ]
         req.httpBody = try JSONSerialization.data(withJSONObject: payload)
@@ -537,9 +542,16 @@ public final class ModelDiagnosticService: ObservableObject {
                 
                 if let choices = json["choices"] as? [[String: Any]],
                    let first = choices.first,
-                   let msg = first["message"] as? [String: Any],
-                   let content = msg["content"] as? String {
-                    playgroundOutput = content
+                   let msg = first["message"] as? [String: Any] {
+                    let content = msg["content"] as? String ?? ""
+                    let reasoning = msg["reasoning_content"] as? String ?? ""
+                    if !content.isEmpty && !reasoning.isEmpty {
+                        playgroundOutput = "🧠 [Razonamiento]:\n\(reasoning)\n\n💬 [Respuesta]:\n\(content)"
+                    } else if !content.isEmpty {
+                        playgroundOutput = content
+                    } else {
+                        playgroundOutput = reasoning
+                    }
                 }
                 
                 if let usage = json["usage"] as? [String: Any] {
