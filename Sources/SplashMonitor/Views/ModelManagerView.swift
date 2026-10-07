@@ -6,6 +6,7 @@ public struct ModelManagerView: View {
     @ObservedObject var loc = Localization.shared
     @State private var selectedTab: Int = 0 // 0: Instalados, 1: Explorar HF, 2: Personalizado
     @State private var customRepoId: String = ""
+    @State private var customModelLanguageOnly: Bool = false
     @State private var searchText: String = ""
     
     // Model deletion alert state
@@ -332,11 +333,17 @@ public struct ModelManagerView: View {
                 TextField(tr(es: "propietario/modelo[:variante] (ej. incoai/Qwen3.8-27B-Splash)", en: "owner/repo[:variant] (e.g. incoai/Qwen3.8-27B-Splash)"), text: $customRepoId)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11, design: .monospaced))
+                    .onChange(of: customRepoId) { newVal in
+                        let lower = newVal.lowercased()
+                        if lower.contains("coder") || lower.contains("code") {
+                            customModelLanguageOnly = true
+                        }
+                    }
                 
                 Button {
                     let trimmed = customRepoId.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { return }
-                    service.installModel(repoId: trimmed)
+                    service.installModel(repoId: trimmed, languageOnly: customModelLanguageOnly)
                 } label: {
                     Text(tr(es: "Descargar", en: "Download"))
                 }
@@ -344,6 +351,20 @@ public struct ModelManagerView: View {
                 .controlSize(.regular)
                 .disabled(service.isInstalling || customRepoId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+            
+            Toggle(isOn: $customModelLanguageOnly) {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 10))
+                        .foregroundColor(.orange)
+                    Text(tr(
+                        es: "Modo solo texto / código (--language-only, requerido para modelos Coder sin mmproj)",
+                        en: "Text/code-only mode (--language-only, required for Coder models without mmproj)"
+                    ))
+                    .font(.system(size: 10))
+                }
+            }
+            .toggleStyle(.checkbox)
             
             HStack(spacing: 6) {
                 Image(systemName: "info.circle")

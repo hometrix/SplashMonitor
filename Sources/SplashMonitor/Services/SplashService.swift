@@ -775,7 +775,7 @@ public class SplashService: ObservableObject {
     
     // MARK: - Model Installation
     
-    public func installModel(repoId: String) {
+    public func installModel(repoId: String, languageOnly: Bool? = nil) {
         guard !isInstalling else { return }
         guard ModelIDValidator.isValid(repoId) else {
             self.lastError = ModelIDValidator.rejectionReason(repoId) ?? "Identificador de modelo no válido."
@@ -783,7 +783,11 @@ public class SplashService: ObservableObject {
         }
         isInstalling = true
         installingModelId = repoId
+        let initialLangOnly = languageOnly ?? (repoId.lowercased().contains("coder") || repoId.lowercased().contains("code"))
         installLogs = ["Iniciando descarga y preparación para \(repoId)..."]
+        if initialLangOnly {
+            installLogs.append("ℹ️ Modo solo texto / código (--language-only) activado.")
+        }
         installSuccess = nil
         
         let modelsPath = modelsDirectory.path
@@ -801,53 +805,92 @@ public class SplashService: ObservableObject {
                 return
             }
             
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: pythonPath)
-            process.arguments = ["-u", scriptPath, "--models", modelsPath, "--model", repoId, "prepare"]
-            
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = pipe
-            
-            let outHandle = pipe.fileHandleForReading
-            outHandle.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-                let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
-                Task { @MainActor in
-                    for line in lines {
-                        self.installLogs.append(line)
-                    }
+            func runPrepareProcess(withLanguageOnly: Bool) -> (success: Bool, logs: [String]) {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: pythonPath)
+                var args = ["-u", scriptPath, "--models", modelsPath, "--model", repoId]
+                if withLanguageOnly {
+                    args.append("--language-only")
                 }
-            }
-            
-            await MainActor.run {
-                self.installProcess = process
-            }
-            
-            do {
-                try process.run()
-                process.waitUntilExit()
-                outHandle.readabilityHandler = nil
+                args.append("prepare")
+                process.arguments = args
                 
-                let success = process.terminationStatus == 0
-                await MainActor.run {
-                    self.installProcess = nil
-                    self.isInstalling = false
-                    self.installSuccess = success
-                    if success {
-                        self.installLogs.append(" Instalación y verificación de \(repoId) completada con éxito.")
-                        self.refreshInstalledModels()
-                    } else {
-                        self.installLogs.append(" Error al instalar \(repoId). Código de salida: \(process.terminationStatus)")
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = pipe
+                
+                final class LogCollector: @unchecked Sendable {
+                    private let lock = NSLock()
+                    private var logs: [String] = []
+                    func append(_ lines: [String]) {
+                        lock.lock()
+                        logs.append(contentsOf: lines)
+                        lock.unlock()
+                    }
+                    func getLogs() -> [String] {
+                        lock.lock()
+                        defer { lock.unlock() }
+                        return logs
                     }
                 }
-            } catch {
-                await MainActor.run {
-                    self.installProcess = nil
-                    self.isInstalling = false
-                    self.installSuccess = false
-                    self.installLogs.append(" Error ejecutando proceso: \(error.localizedDescription)")
+                
+                let collector = LogCollector()
+                
+                let outHandle = pipe.fileHandleForReading
+                outHandle.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                    let lines = text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                    collector.append(lines)
+                    Task { @MainActor in
+                        for line in lines {
+                            self.installLogs.append(line)
+                        }
+                    }
+                }
+                
+                Task { @MainActor in
+                    self.installProcess = process
+                }
+                
+                do {
+                    try process.run()
+                    process.waitUntilExit()
+                    outHandle.readabilityHandler = nil
+                    return (process.terminationStatus == 0, collector.getLogs())
+                } catch {
+                    outHandle.readabilityHandler = nil
+                    return (false, collector.getLogs())
+                }
+            }
+            
+            var (success, logs) = runPrepareProcess(withLanguageOnly: initialLangOnly)
+            
+            // Auto-fallback: Si falló porque no tiene proyector mmproj y no se había usado languageOnly, reintentar con --language-only
+            if !success && !initialLangOnly {
+                let joinedLogs = logs.joined(separator: " ").lowercased()
+                if joinedLogs.contains("vision projector") || joinedLogs.contains("mmproj") || joinedLogs.contains("--language-only") {
+                    await MainActor.run {
+                        self.installLogs.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                        self.installLogs.append("ℹ️ Detectado modelo de código/texto sin proyector de visión (mmproj).")
+                        self.installLogs.append("🔄 Reintentando preparación automáticamente con --language-only...")
+                        self.installLogs.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                    }
+                    let secondPass = runPrepareProcess(withLanguageOnly: true)
+                    success = secondPass.success
+                }
+            }
+            
+            let finalSuccess = success
+            await MainActor.run {
+                self.installProcess = nil
+                self.isInstalling = false
+                self.installSuccess = finalSuccess
+                if finalSuccess {
+                    self.installLogs.append("✅ Instalación y verificación de \(repoId) completada con éxito.")
+                    self.refreshInstalledModels()
+                } else {
+                    self.installLogs.append("❌ Error al instalar \(repoId).")
                 }
             }
         }

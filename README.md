@@ -145,17 +145,23 @@ Cada módulo de **Splash Monitor** está optimizado para la experiencia nativa d
 
 #### 5. 📦 Gestor de Modelos de Hugging Face
 <img src="screenshots/module-models.png" width="850" alt="Gestor de Modelos de Hugging Face" />
-<p><b>Módulo de Modelos:</b> Control de modelos locales en disco con espacio utilizado, cambio en caliente y exploración del catálogo de Hugging Face con instalación en un clic.</p>
+<p><b>Módulo de Modelos:</b> Control de modelos locales en disco con espacio utilizado, cambio en caliente y exploración del catálogo de Hugging Face con soporte para variantes GGUF y modo <code>--language-only</code> para modelos Coder.</p>
 
 <br/>
 
-#### 6. ⚙️ Configuración del Sistema
+#### 6. 🧪 Test y Diagnóstico de Modelos (Model Lab)
+<img src="screenshots/module-modelTesting.png" width="850" alt="Test y Diagnóstico de Modelos" />
+<p><b>Módulo de Test y Diagnóstico:</b> Suite completa de verificación en un clic con Smoke Test (salud del servidor, disponibilidad Metal, plantilla Jinja, OpenAI Chat, Anthropic Messages y llamadas a herramientas/JSON), Benchmarking de velocidad con cálculo del factor de aceleración del KV Cache y Playground interactivo de inferencia local.</p>
+
+<br/>
+
+#### 7. ⚙️ Configuración del Sistema
 <img src="screenshots/module-settings.png" width="850" alt="Configuración del Sistema" />
 <p><b>Módulo de Ajustes:</b> Selector de idioma (Español Dominicano 🇩🇴 / English 🇬🇧 / macOS automático), configuración del ícono en la barra de menú superior de macOS y frecuencia de refresco.</p>
 
 <br/>
 
-#### 7. ℹ️ Acerca de Splash Monitor
+#### 8. ℹ️ Acerca de Splash Monitor
 <img src="screenshots/module-about.png" width="850" alt="Acerca de Splash Monitor" />
 <p><b>Módulo Informativo:</b> Información de versión (v1.0.5-beta), arquitectura nativa en Swift 6 y Metal, licencia abierta MIT y créditos de autoría de Joan Gregorio Pérez (JMGREP Developers).</p>
 
@@ -535,17 +541,23 @@ Every module of **Splash Monitor** is designed and optimized for a native Apple 
 
 #### 5. 📦 Hugging Face Local Model Manager
 <img src="screenshots/module-models.png" width="850" alt="Hugging Face Local Model Manager" />
-<p><b>Model Management Module:</b> Disk footprint inspection for local models, hot-swap deployment, and Hugging Face catalog exploration with single-click background installation.</p>
+<p><b>Model Management Module:</b> Disk footprint inspection for local models, hot-swap deployment, and Hugging Face catalog exploration with support for GGUF variants and <code>--language-only</code> mode for Coder models.</p>
 
 <br/>
 
-#### 6. ⚙️ System Preferences & Settings
+#### 6. 🧪 Model Testing & Diagnostics Lab
+<img src="screenshots/module-modelTesting.png" width="850" alt="Model Testing & Diagnostics Lab" />
+<p><b>Model Testing Module:</b> Complete one-click verification suite with Smoke Testing (server health, Metal engine readiness, Jinja templates, OpenAI Chat, Anthropic Messages, and Tool Calling/JSON validation), Metal speed benchmarking with KV Cache speedup factor calculation, and an interactive local inference Playground.</p>
+
+<br/>
+
+#### 7. ⚙️ System Preferences & Settings
 <img src="screenshots/module-settings.png" width="850" alt="System Preferences and Settings" />
 <p><b>Settings Module:</b> Language selector (Dominican Spanish 🇩🇴 / English 🇬🇧 / macOS auto-sync), customizable macOS menu bar item display modes, and background polling interval controls.</p>
 
 <br/>
 
-#### 7. ℹ️ About Splash Monitor
+#### 8. ℹ️ About Splash Monitor
 <img src="screenshots/module-about.png" width="850" alt="About Splash Monitor" />
 <p><b>About Module:</b> Version information (v1.0.5-beta), native Swift 6 and Metal architecture details, MIT open-source license, and author credits for Joan Gregorio Pérez (JMGREP Developers).</p>
 

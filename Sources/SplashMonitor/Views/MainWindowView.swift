@@ -13,6 +13,7 @@ public struct MainWindowView: View {
         case connectedApps
         case models
         case server
+        case modelTesting
         case settings
         case about
         
@@ -24,6 +25,7 @@ public struct MainWindowView: View {
             case .connectedApps: return isSpanish ? "Apps Conectadas" : "Connected Apps"
             case .models: return isSpanish ? "Gestor de Modelos" : "Model Manager"
             case .server: return isSpanish ? "Servidor y Agentes" : "Server & Agents"
+            case .modelTesting: return isSpanish ? "Test de Modelos" : "Model Testing"
             case .settings: return isSpanish ? "Configuración" : "Settings"
             case .about: return isSpanish ? "Acerca de" : "About"
             }
@@ -35,6 +37,7 @@ public struct MainWindowView: View {
             case .connectedApps: return "app.connected.to.app.below.fill"
             case .models: return "shippingbox"
             case .server: return "server.rack"
+            case .modelTesting: return "testtube.2"
             case .settings: return "gearshape"
             case .about: return "info.circle"
             }
@@ -207,6 +210,8 @@ public struct MainWindowView: View {
                             ModelManagerView(service: service)
                         case .server:
                             ServerControlView(service: service)
+                        case .modelTesting:
+                            ModelTestingView(service: service)
                         case .settings:
                             settingsDetailView
                         case .about:
