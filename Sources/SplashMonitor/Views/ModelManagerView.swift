@@ -116,6 +116,24 @@ public struct ModelManagerView: View {
                                                 .foregroundColor(.green)
                                                 .cornerRadius(4)
                                         }
+                                        if let variant = model.variant {
+                                            Text(variant)
+                                                .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color.blue.opacity(0.15))
+                                                .foregroundColor(.blue)
+                                                .cornerRadius(4)
+                                        }
+                                        if model.isCoderFineTune {
+                                            Text(tr(es: "CODER", en: "CODER"))
+                                                .font(.system(size: 8, weight: .bold))
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color.orange.opacity(0.15))
+                                                .foregroundColor(.orange)
+                                                .cornerRadius(4)
+                                        }
                                     }
                                     
                                     HStack(spacing: 8) {
@@ -304,14 +322,14 @@ public struct ModelManagerView: View {
                 .font(.system(size: 12, weight: .semibold))
             
             Text(tr(
-                es: "Introduce el identificador de repositorio que contiene un paquete Splash (ej. incoai/Qwen3.8-27B-Splash).",
-                en: "Enter the repository identifier containing a Splash package (e.g. incoai/Qwen3.8-27B-Splash)."
+                es: "Introduce el identificador de repositorio en Hugging Face o fine-tune GGUF con variante (ej. incoai/Qwen3.8-27B-Splash o peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL).",
+                en: "Enter the Hugging Face repository or GGUF fine-tune with variant (e.g. incoai/Qwen3.8-27B-Splash or peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL)."
             ))
             .font(.system(size: 10))
             .foregroundColor(.secondary)
             
             HStack {
-                TextField(tr(es: "propietario/modelo (ej. incoai/Qwen3.8-27B-Splash)", en: "owner/repo (e.g. incoai/Qwen3.8-27B-Splash)"), text: $customRepoId)
+                TextField(tr(es: "propietario/modelo[:variante] (ej. incoai/Qwen3.8-27B-Splash)", en: "owner/repo[:variant] (e.g. incoai/Qwen3.8-27B-Splash)"), text: $customRepoId)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11, design: .monospaced))
                 

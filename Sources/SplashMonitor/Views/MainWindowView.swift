@@ -520,6 +520,20 @@ public struct MainWindowView: View {
                      : "Configures the --max-context flag to limit or expand memory reserved for token history.")
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
+                
+                Divider()
+                
+                Toggle(loc.isSpanish
+                       ? "Modo Solo Lenguaje / Código (--language-only)"
+                       : "Language / Code Only mode (--language-only)",
+                       isOn: $service.languageOnly)
+                    .font(.system(size: 12))
+                
+                Text(loc.isSpanish
+                     ? "Desactiva la carga del proyector de visión (mmproj). Requerido para modelos de código GGUF (como Tiel-Coder, Qwopus, Cyber-Tiel) que no incluyen pesos de imágenes."
+                     : "Disables vision projector (mmproj) loading. Required for GGUF coder models (like Tiel-Coder, Qwopus, Cyber-Tiel) that lack image weights.")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
             }
             .padding(14)
             .background(Color(nsColor: .controlBackgroundColor))

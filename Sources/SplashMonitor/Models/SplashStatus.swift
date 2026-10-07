@@ -14,6 +14,8 @@ public struct SplashStatus: Codable {
     public let scheduler: SchedulerMetrics?
     public let requests: RequestMetrics?
     public let metrics: PerformanceMetrics?
+    public let vision: Bool?
+    public let inputModalities: [String]?
     
     enum CodingKeys: String, CodingKey {
         case ready
@@ -27,6 +29,8 @@ public struct SplashStatus: Codable {
         case scheduler
         case requests
         case metrics
+        case vision
+        case inputModalities = "input_modalities"
     }
 }
 
@@ -243,5 +247,14 @@ public struct InstalledSplashModel: Identifiable, Hashable {
     
     public var shortName: String {
         repoId.components(separatedBy: "/").last ?? repoId
+    }
+    
+    public var variant: String? {
+        ModelIDValidator.components(from: repoId)?.variant
+    }
+    
+    public var isCoderFineTune: Bool {
+        let lower = repoId.lowercased()
+        return lower.contains("coder") || lower.contains("code") || lower.contains("qwopus") || lower.contains("tiel")
     }
 }

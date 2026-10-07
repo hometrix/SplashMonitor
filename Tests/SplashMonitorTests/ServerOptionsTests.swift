@@ -174,6 +174,54 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(cmd.contains("--served-model-name \"claude-3-7-sonnet-20250219\""), "Debe inyectar 3-7-sonnet: \(cmd)")
         XCTAssertTrue(cmd.contains("--served-model-name \"claude-sonnet-4-5\""), "Debe inyectar sonnet-4-5 para Cowork: \(cmd)")
     }
+    
+    func testServerLaunchInjectsLanguageOnlyFlag() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        
+        // Sin flag activo
+        service.languageOnly = false
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmdNormal = capturedCommand.value else {
+            XCTFail("No command captured")
+            return
+        }
+        XCTAssertFalse(cmdNormal.contains("--language-only"), "No debe inyectar --language-only si está desactivado")
+        XCTAssertTrue(cmdNormal.contains("👁️ Modalidad: Multimodal (Texto y Visión)"))
+        
+        // Con flag activo
+        service.languageOnly = true
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmdLangOnly = capturedCommand.value else {
+            XCTFail("No command captured")
+            return
+        }
+        XCTAssertTrue(cmdLangOnly.contains("--language-only"), "Debe inyectar --language-only cuando está activado: \(cmdLangOnly)")
+        XCTAssertTrue(cmdLangOnly.contains("👁️ Modalidad: Solo Texto / Código (--language-only)"))
+    }
+    
+    func testServerLaunchWithModelVariant() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        
+        // Modelo con variante GGUF (peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL)
+        let variantModel = "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL"
+        service.startServer(model: variantModel, port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmd = capturedCommand.value else {
+            XCTFail("No command captured para modelo con variante")
+            return
+        }
+        
+        XCTAssertTrue(cmd.contains("--model \"\(variantModel)\""), "Debe interpolar el modelo completo con su variante: \(cmd)")
+        XCTAssertTrue(cmd.contains("📦 Modelo:   \(variantModel)"), "El banner debe incluir la variante: \(cmd)")
+        XCTAssertNil(service.lastError, "No debe registrar error de validación para un modelo con variante")
+    }
 }
 
 /// Helper para capturar valores dentro de closures concurrentes en tests

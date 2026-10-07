@@ -26,7 +26,7 @@ public struct ServerControlView: View {
         guard isCustomModel else { return nil }
         let value = customModelText.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.isEmpty {
-            return tr(es: "Escribe un identificador owner/repo.", en: "Enter an owner/repo identifier.")
+            return tr(es: "Escribe un identificador owner/repo o owner/repo:variante.", en: "Enter an owner/repo or owner/repo:variant identifier.")
         }
         return ModelIDValidator.rejectionReason(value)
     }
@@ -267,6 +267,23 @@ public struct ServerControlView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    
+                    if let vision = service.status?.vision {
+                        HStack(spacing: 4) {
+                            Image(systemName: vision ? "eye.fill" : "doc.text.fill")
+                                .font(.system(size: 9))
+                            Text(vision ? tr(es: "Visión Activa", en: "Vision Active") : tr(es: "Solo Texto", en: "Text Only"))
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(vision ? Color.purple.opacity(0.15) : Color.orange.opacity(0.15))
+                        .foregroundColor(vision ? .purple : .orange)
+                        .cornerRadius(4)
+                        .help(vision
+                            ? tr(es: "El modelo soporta modalidades de visión (imágenes y PDF).", en: "Model supports vision modalities (images and PDF).")
+                            : tr(es: "El modelo está corriendo en modo solo texto/código (--language-only).", en: "Model is running in text/code only mode (--language-only)."))
+                    }
                 }
                 .padding(.top, 2)
             }
@@ -493,6 +510,47 @@ public struct ServerControlView: View {
                 .help(tr(
                     es: "Límite máximo de tokens de contexto (--max-context) para la inferencia de Splash.",
                     en: "Maximum context token limit (--max-context) for Splash inference."
+                ))
+                
+                Divider()
+                    .frame(height: 14)
+                
+                // Selector de Modalidad (Visión vs Solo Texto / --language-only)
+                Menu {
+                    Button {
+                        service.languageOnly = false
+                    } label: {
+                        HStack {
+                            Text(tr(es: "👁️ Visión + Texto (Normal)", en: "👁️ Vision + Text (Standard)"))
+                            if !service.languageOnly {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    Button {
+                        service.languageOnly = true
+                    } label: {
+                        HStack {
+                            Text(tr(es: "📝 Solo Texto / Código (--language-only)", en: "📝 Text / Code Only (--language-only)"))
+                            if service.languageOnly {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: service.languageOnly ? "doc.text" : "eye")
+                            .font(.system(size: 9))
+                            .foregroundColor(service.languageOnly ? .orange : .teal)
+                        Text(service.languageOnly ? tr(es: "Solo Texto", en: "Text Only") : tr(es: "Visión", en: "Vision"))
+                            .font(.system(size: 10, design: .monospaced))
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(tr(
+                    es: "Configura si Splash debe inicializar soporte multimodal de imágenes o modo solo texto (--language-only, requerido para modelos Coder sin proyector mmproj).",
+                    en: "Configures whether Splash should initialize multimodal image support or text-only mode (--language-only, required for Coder models without mmproj projectors)."
                 ))
                 
                 Spacer()

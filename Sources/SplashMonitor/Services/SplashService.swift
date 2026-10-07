@@ -89,6 +89,7 @@ public class SplashService: ObservableObject {
     @AppStorage("listenOnAllInterfaces") public var listenOnAllInterfaces: Bool = false
     @AppStorage("maxContext") public var maxContext: String = "auto"
     @AppStorage("allowedHosts") public var allowedHosts: String = ""
+    @AppStorage("languageOnly") public var languageOnly: Bool = false
     
     /// Dirección IPv4 primaria en la red de área local (ej. "192.168.1.49").
     public var localNetworkIP: String? {
@@ -1178,11 +1179,13 @@ public class SplashService: ObservableObject {
                 }
             }
             
-            let extraOptions = [hostFlag, allowedHostFlags, contextFlag].filter { !$0.isEmpty }.joined(separator: " ")
+            let languageFlag = self.languageOnly ? "--language-only" : ""
+            let extraOptions = [hostFlag, allowedHostFlags, contextFlag, languageFlag].filter { !$0.isEmpty }.joined(separator: " ")
             let runCmd = "\"\(splashPath)\" serve --model \"\(validatedModel)\" --port \"\(port)\" \(extraOptions) \(aliasFlags)"
             
             let hostLabel = self.listenOnAllInterfaces ? "0.0.0.0 (Toda la red local / LAN)" : "127.0.0.1 (Solo localhost)"
             let contextLabel = (trimmedContext.isEmpty || trimmedContext.lowercased() == "auto") ? "Automático (por memoria)" : trimmedContext.uppercased()
+            let modalityLabel = self.languageOnly ? "Solo Texto / Código (--language-only)" : "Multimodal (Texto y Visión)"
             let allowedHostsEcho = parsedAllowedHosts.isEmpty ? "" : "\necho \"🛡️ Dominios: \(parsedAllowedHosts.joined(separator: ", "))\""
             
             let cmd = """
@@ -1192,6 +1195,7 @@ public class SplashService: ObservableObject {
             echo "🔌 Puerto:   \(port)"
             echo "🌐 Red/Host: \(hostLabel)"\(allowedHostsEcho)
             echo "🧠 Contexto: \(contextLabel)"
+            echo "👁️ Modalidad: \(modalityLabel)"
             echo "⚡️ Motor:    \(splashPath)"
             echo "==============================================="
             echo "Presiona Ctrl+C en esta ventana para detener el servidor."

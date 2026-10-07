@@ -57,4 +57,40 @@ final class ModelIDValidatorTests: XCTestCase {
         let injection = try XCTUnwrap(ModelIDValidator.rejectionReason("a/b\"c"))
         XCTAssertTrue(injection.contains("caracteres no permitidos"))
     }
+    
+    func testAcceptsIdentifiersWithVariants() {
+        // Modelos de fine-tunes de código y cuantizaciones soportadas oficialmente por Splash
+        XCTAssertTrue(ModelIDValidator.isValid("peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL"))
+        XCTAssertTrue(ModelIDValidator.isValid("unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_M"))
+        XCTAssertTrue(ModelIDValidator.isValid("Jackrong/Qwopus3.6-35B-A3B-Coder-MTP-GGUF:Q4_K_M"))
+        XCTAssertTrue(ModelIDValidator.isValid("peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_M"))
+        
+        let normalized = ModelIDValidator.normalized("  peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL  ")
+        XCTAssertEqual(normalized, "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL")
+        
+        XCTAssertTrue(ModelIDValidator.hasVariant("peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL"))
+        XCTAssertFalse(ModelIDValidator.hasVariant("incoai/Qwen3.8-27B-Splash"))
+    }
+    
+    func testExtractsComponentsCorrectly() throws {
+        let comp1 = try XCTUnwrap(ModelIDValidator.components(from: "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL"))
+        XCTAssertEqual(comp1.owner, "peculiar-ragdoll")
+        XCTAssertEqual(comp1.repository, "Tiel-Coder-35B-A3B-GGUF-MTP")
+        XCTAssertEqual(comp1.variant, "UD-Q4_K_XL")
+        XCTAssertEqual(ModelIDValidator.baseModelId("peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL"), "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP")
+        
+        let comp2 = try XCTUnwrap(ModelIDValidator.components(from: "incoai/Qwen3.8-27B-Splash"))
+        XCTAssertEqual(comp2.owner, "incoai")
+        XCTAssertEqual(comp2.repository, "Qwen3.8-27B-Splash")
+        XCTAssertNil(comp2.variant)
+        XCTAssertEqual(ModelIDValidator.baseModelId("incoai/Qwen3.8-27B-Splash"), "incoai/Qwen3.8-27B-Splash")
+    }
+    
+    func testRejectsMalformedVariants() {
+        XCTAssertFalse(ModelIDValidator.isValid("incoai/model:")) // Variante vacía
+        XCTAssertFalse(ModelIDValidator.isValid("incoai/model:var1:var2")) // Múltiples dos puntos
+        XCTAssertFalse(ModelIDValidator.isValid("incoai:variant/model")) // Dos puntos en owner
+        XCTAssertFalse(ModelIDValidator.isValid("incoai/model:..")) // Traversal en variante
+        XCTAssertFalse(ModelIDValidator.isValid("incoai/model:var\"injection")) // Inyección en variante
+    }
 }
