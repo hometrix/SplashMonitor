@@ -173,6 +173,9 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(cmd.contains("--served-model-name \"claude-haiku-4-5-20251001\""), "Debe inyectar haiku-4-5-20251001: \(cmd)")
         XCTAssertTrue(cmd.contains("--served-model-name \"claude-3-7-sonnet-20250219\""), "Debe inyectar 3-7-sonnet: \(cmd)")
         XCTAssertTrue(cmd.contains("--served-model-name \"claude-sonnet-4-5\""), "Debe inyectar sonnet-4-5 para Cowork: \(cmd)")
+        // Verifica alias para ChatGPT / OpenAI y Codex
+        XCTAssertTrue(cmd.contains("--served-model-name \"gpt-4o\""), "Debe inyectar gpt-4o para ChatGPT Desktop: \(cmd)")
+        XCTAssertTrue(cmd.contains("--served-model-name \"codex\""), "Debe inyectar codex: \(cmd)")
     }
     
     func testServerLaunchInjectsLanguageOnlyFlag() async throws {

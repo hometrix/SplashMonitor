@@ -1160,8 +1160,28 @@ public class SplashService: ObservableObject {
             
             let splashPath = self.splashExecutablePath
             
-            // Aliases de modelos Anthropic para Claude Desktop (Cowork, Code/Codex, Claude Code CLI)
-            let modelAliases = [
+            // Aliases de modelos Anthropic, OpenAI y de la familia Splash/IncoAI
+            let baseModelAliases = [
+                // Familia IncoAI / Splash (resuelve clientes configurados con modelos nativos de Splash)
+                "incoai/Qwen3.6-35B-A3B-Splash",
+                "incoai/Qwen3.8-27B-Splash",
+                "incoai/Qwen3.5-35B-A3B-Splash",
+                "incoai/Qwen2.5-Coder-32B-Instruct",
+                "Qwen3.6-35B-A3B-Splash",
+                "Qwen3.8-27B-Splash",
+                // Familia OpenAI & ChatGPT (Desktop Codex / OWL, Chatbox, Cursor)
+                "gpt-4o",
+                "gpt-4o-mini",
+                "gpt-4",
+                "gpt-4-turbo",
+                "gpt-3.5-turbo",
+                "o1",
+                "o1-preview",
+                "o1-mini",
+                "o3-mini",
+                "codex",
+                "chatgpt",
+                "default",
                 // Familia Sonnet (Pestaña Code / CCD y Cowork)
                 "claude-sonnet-4-6",
                 "claude-sonnet-5",
@@ -1188,7 +1208,29 @@ public class SplashService: ObservableObject {
                 "claude-fable-5",
                 "claude-fable-5-1"
             ]
-            let aliasFlags = modelAliases.map { "--served-model-name \"\($0)\"" }.joined(separator: " ")
+            
+            var allAliases = Set(baseModelAliases)
+            let codexConfigURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
+            if let configData = try? String(contentsOf: codexConfigURL, encoding: .utf8) {
+                for line in configData.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if trimmed.hasPrefix("model") && trimmed.contains("=") {
+                        let parts = trimmed.split(separator: "=", maxSplits: 1).map { String($0) }
+                        if parts.count == 2 {
+                            let val = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))
+                            if !val.isEmpty {
+                                allAliases.insert(val)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            let aliasFlags = allAliases
+                .filter { $0 != validatedModel }
+                .sorted()
+                .map { "--served-model-name \"\($0)\"" }
+                .joined(separator: " ")
             
             // Opciones de red, allowed-hosts y contexto (--host, --allowed-host y --max-context)
             let hostFlag = self.listenOnAllInterfaces ? "--host \"0.0.0.0\"" : "--host \"127.0.0.1\""
