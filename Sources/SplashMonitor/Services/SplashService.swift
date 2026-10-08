@@ -1210,11 +1210,17 @@ public class SplashService: ObservableObject {
             ]
             
             var allAliases = Set(baseModelAliases)
+            
+            // Agregar TODOS los modelos instalados localmente para que cualquier cliente pueda solicitar cualquiera de ellos sin 404
+            for installed in self.installedModels {
+                allAliases.insert(installed.repoId)
+            }
+            
             let codexConfigURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/config.toml")
             if let configData = try? String(contentsOf: codexConfigURL, encoding: .utf8) {
                 for line in configData.components(separatedBy: .newlines) {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
-                    if trimmed.hasPrefix("model") && trimmed.contains("=") {
+                    if trimmed.hasPrefix("model") && trimmed.contains("=") && !trimmed.hasPrefix("model_") {
                         let parts = trimmed.split(separator: "=", maxSplits: 1).map { String($0) }
                         if parts.count == 2 {
                             let val = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: " \"'"))
@@ -1388,6 +1394,9 @@ public class SplashService: ObservableObject {
         let envFile = home.appendingPathComponent(ShellEnvironment.fileName)
         try? ShellEnvironment.fileContents(port: port).write(to: envFile, atomically: true, encoding: .utf8)
         
+        let targetModel = !self.activeModel.isEmpty && self.activeModel != "Ninguno" ? self.activeModel : self.selectedModelForLaunch
+        syncCodexEnvironment(model: targetModel, port: port)
+        
         switch ShellConsent.decide(hasConsent: shellConfigConsent, userDeclined: shellConfigDeclined) {
         case .write:
             injectShellSource(envFile: envFile)
@@ -1445,6 +1454,42 @@ public class SplashService: ObservableObject {
             }
         }
         try? FileManager.default.removeItem(at: envFile)
+    }
+    
+    // MARK: - Sincronización de Codex & ChatGPT Config (~/.codex/config.toml)
+    
+    /// Sincroniza el modelo cargado y el puerto activo en ~/.codex/config.toml
+    /// para que ChatGPT Desktop (Codex & OWL) trabaje automáticamente con el modelo activo.
+    public func syncCodexEnvironment(model: String, port: Int) {
+        guard !model.isEmpty && model != "Ninguno" else { return }
+        let home = shellEnvironmentDirectory ?? FileManager.default.homeDirectoryForCurrentUser
+        let codexConfigURL = home.appendingPathComponent(".codex/config.toml")
+        guard FileManager.default.fileExists(atPath: codexConfigURL.path),
+              let content = try? String(contentsOf: codexConfigURL, encoding: .utf8) else {
+            return
+        }
+        
+        var lines = content.components(separatedBy: .newlines)
+        var updated = false
+        for (i, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("model") && trimmed.contains("=") && !trimmed.hasPrefix("model_") {
+                lines[i] = "model = \"\(model)\""
+                updated = true
+            } else if trimmed.hasPrefix("openai_base_url") && trimmed.contains("=") {
+                lines[i] = "openai_base_url = \"http://127.0.0.1:\(port)/v1\""
+                updated = true
+            }
+        }
+        
+        if updated {
+            let newContent = lines.joined(separator: "\n")
+            if let override = shellWriteOverride {
+                override(newContent, codexConfigURL)
+            } else {
+                try? newContent.write(to: codexConfigURL, atomically: true, encoding: .utf8)
+            }
+        }
     }
     
     // MARK: - Agent Launcher Helpers
@@ -1562,6 +1607,9 @@ public class SplashService: ObservableObject {
         
         // Manejo específico para ChatGPT Desktop / Codex (App GUI macOS)
         if agent == "chatgpt" {
+            let targetModel = !self.activeModel.isEmpty && self.activeModel != "Ninguno" ? self.activeModel : self.selectedModelForLaunch
+            syncCodexEnvironment(model: targetModel, port: self.activePort)
+            
             let home = FileManager.default.homeDirectoryForCurrentUser.path
             let appURL = [
                 URL(fileURLWithPath: "/Applications/ChatGPT.app"),

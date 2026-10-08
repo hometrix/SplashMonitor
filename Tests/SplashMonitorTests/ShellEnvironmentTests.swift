@@ -85,4 +85,33 @@ final class ShellEnvironmentTests: XCTestCase {
         service.clearShellEnvironment()
         XCTAssertFalse(dir.exists(ShellEnvironment.fileName))
     }
+    
+    @MainActor
+    func testSyncCodexEnvironmentUpdatesModelAndBaseURL() throws {
+        let dir = try TempDirectory()
+        let service = SplashService(transport: StubStatusTransport(),
+                                    terminator: RecordingServerTerminator(),
+                                    pollInterval: 30,
+                                    dataDirectoryRoot: dir.url,
+                                    bootstrapNetwork: false)
+        service.shellEnvironmentDirectory = dir.url
+        
+        let codexDir = dir.url.appendingPathComponent(".codex")
+        try FileManager.default.createDirectory(at: codexDir, withIntermediateDirectories: true)
+        let configURL = codexDir.appendingPathComponent("config.toml")
+        
+        let sampleConfig = """
+        model = "incoai/Qwen3.6-35B-A3B-Splash"
+        model_context_window = 65536
+        openai_base_url = "http://127.0.0.1:8000/v1"
+        """
+        try sampleConfig.write(to: configURL, atomically: true, encoding: .utf8)
+        
+        service.syncCodexEnvironment(model: "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL", port: 8005)
+        
+        let updated = try String(contentsOf: configURL, encoding: .utf8)
+        XCTAssertTrue(updated.contains("model = \"peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP:UD-Q4_K_XL\""))
+        XCTAssertTrue(updated.contains("openai_base_url = \"http://127.0.0.1:8005/v1\""))
+        XCTAssertTrue(updated.contains("model_context_window = 65536"))
+    }
 }
