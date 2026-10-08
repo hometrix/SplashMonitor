@@ -639,6 +639,55 @@ public class SplashService: ObservableObject {
                     ))
                 }
             }
+            
+            // Escanear también el directorio .resolved de Splash
+            // Splash guarda en .resolved los modelos preparados/instalados (incluyendo los que tienen opciones como --language-only o GGUFs)
+            let resolvedDirectory = modelsDirectory.appendingPathComponent(".resolved")
+            if fm.fileExists(atPath: resolvedDirectory.path),
+               let resolvedDirs = try? fm.contentsOfDirectory(at: resolvedDirectory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
+                for resolvedURL in resolvedDirs where resolvedURL.hasDirectoryPath {
+                    let modelJsonURL = resolvedURL.appendingPathComponent("model.json")
+                    guard fm.fileExists(atPath: modelJsonURL.path),
+                          let data = try? Data(contentsOf: modelJsonURL),
+                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let modelId = json["model"] as? String,
+                          !modelId.isEmpty else {
+                        continue
+                    }
+                    
+                    // Si ya fue encontrado por el escaneo directo de carpetas, continuar
+                    if results.contains(where: { $0.repoId == modelId }) {
+                        continue
+                    }
+                    
+                    // Crear enlace simbólico de cortesía en models/OWNER/MODEL_NAME si no existe
+                    let parts = modelId.split(separator: "/", maxSplits: 1).map { String($0) }
+                    if parts.count == 2 {
+                        let owner = parts[0]
+                        let modelName = parts[1]
+                        let ownerDir = modelsDirectory.appendingPathComponent(owner)
+                        let targetSymlink = ownerDir.appendingPathComponent(modelName)
+                        if !fm.fileExists(atPath: targetSymlink.path) {
+                            try? fm.createDirectory(at: ownerDir, withIntermediateDirectories: true)
+                            try? fm.createSymbolicLink(at: targetSymlink, withDestinationURL: resolvedURL)
+                        }
+                    }
+                    
+                    let isActive = (modelId == self.activeModel && self.isRunning)
+                    let stamp = (try? resolvedURL.resourceValues(forKeys: [.contentModificationDateKey]))?
+                        .contentModificationDate
+                    let size = sizeCache.size(repoId: modelId, stamp: stamp) {
+                        Self.directorySize(url: resolvedURL)
+                    }
+                    
+                    results.append(InstalledSplashModel(
+                        repoId: modelId,
+                        localPath: resolvedURL,
+                        diskSizeBytes: size,
+                        isCurrentlyActive: isActive
+                    ))
+                }
+            }
         } catch {
             print("Error scanning installed models: \(error)")
         }
