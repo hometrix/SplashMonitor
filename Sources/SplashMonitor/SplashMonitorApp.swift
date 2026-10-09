@@ -5,11 +5,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         
+        // Desactivar agrupación automática en pestañas para evitar pestañas duplicadas al reabrir
+        NSWindow.allowsAutomaticWindowTabbing = false
+        
         // Cargar icono de la aplicación explícitamente para el Dock
         if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
            let iconImage = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = iconImage
         }
+    }
+    
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            for window in sender.windows where window.canBecomeMain && !(window is NSPanel) {
+                window.makeKeyAndOrderFront(self)
+                return true
+            }
+        }
+        return true
     }
     
     func applicationWillTerminate(_ notification: Notification) {

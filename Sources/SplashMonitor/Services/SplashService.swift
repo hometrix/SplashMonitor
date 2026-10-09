@@ -90,6 +90,7 @@ public class SplashService: ObservableObject {
     @AppStorage("maxContext") public var maxContext: String = "auto"
     @AppStorage("allowedHosts") public var allowedHosts: String = ""
     @AppStorage("languageOnly") public var languageOnly: Bool = false
+    @AppStorage("customServerFlags") public var customServerFlags: String = ""
     
     /// Dirección IPv4 primaria en la red de área local (ej. "192.168.1.49").
     public var localNetworkIP: String? {
@@ -1320,7 +1321,16 @@ public class SplashService: ObservableObject {
             }
             
             let languageFlag = self.languageOnly ? "--language-only" : ""
-            let extraOptions = [hostFlag, allowedHostFlags, contextFlag, languageFlag].filter { !$0.isEmpty }.joined(separator: " ")
+            
+            // Flags CLI adicionales proporcionados por el usuario (ej. --no-webui --max-cache-disk 50GB)
+            let (customTokens, customError) = ServerCLIValidator.validateAndTokenize(self.customServerFlags)
+            if let err = customError {
+                print("⚠️ [SplashService] Flags CLI adicionales ignorados por seguridad: \(err)")
+            }
+            let customFlagsString = customTokens.joined(separator: " ")
+            let customFlagsEcho = customTokens.isEmpty ? "" : "\necho \"🛠️ Flags CLI:  \(customFlagsString)\""
+            
+            let extraOptions = [hostFlag, allowedHostFlags, contextFlag, languageFlag, customFlagsString].filter { !$0.isEmpty }.joined(separator: " ")
             let runCmd = "\"\(splashPath)\" serve --model \"\(validatedModel)\" --port \"\(port)\" \(extraOptions) \(aliasFlags)"
             
             let hostLabel = self.listenOnAllInterfaces ? "0.0.0.0 (Toda la red local / LAN)" : "127.0.0.1 (Solo localhost)"
@@ -1335,7 +1345,7 @@ public class SplashService: ObservableObject {
             echo "🔌 Puerto:   \(port)"
             echo "🌐 Red/Host: \(hostLabel)"\(allowedHostsEcho)
             echo "🧠 Contexto: \(contextLabel)"
-            echo "👁️ Modalidad: \(modalityLabel)"
+            echo "👁️ Modalidad: \(modalityLabel)"\(customFlagsEcho)
             echo "⚡️ Motor:    \(splashPath)"
             echo "==============================================="
             echo "Presiona Ctrl+C en esta ventana para detener el servidor."

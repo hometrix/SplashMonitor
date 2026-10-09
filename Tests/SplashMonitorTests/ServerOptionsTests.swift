@@ -225,6 +225,41 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(cmd.contains("📦 Modelo:   \(variantModel)"), "El banner debe incluir la variante: \(cmd)")
         XCTAssertNil(service.lastError, "No debe registrar error de validación para un modelo con variante")
     }
+    
+    func testServerLaunchWithCustomServerFlagsInjectsTokens() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        service.customServerFlags = "--no-webui --max-cache-disk 50GB"
+        
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmd = capturedCommand.value else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        XCTAssertTrue(cmd.contains("--no-webui"), "Debe inyectar el flag --no-webui: \(cmd)")
+        XCTAssertTrue(cmd.contains("--max-cache-disk 50GB"), "Debe inyectar --max-cache-disk 50GB: \(cmd)")
+        XCTAssertTrue(cmd.contains("🛠️ Flags CLI:  --no-webui --max-cache-disk 50GB"), "El banner debe mostrar los flags: \(cmd)")
+    }
+    
+    func testServerLaunchSanitizesMaliciousCustomFlags() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        service.customServerFlags = "--no-webui ; rm -rf /"
+        
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        
+        guard let cmd = capturedCommand.value else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        XCTAssertFalse(cmd.contains("rm -rf"), "No debe inyectar comandos maliciosos: \(cmd)")
+        XCTAssertFalse(cmd.contains("--no-webui"), "Debe descartar toda la cadena de flags si contiene metacaracteres peligrosos: \(cmd)")
+    }
 }
 
 /// Helper para capturar valores dentro de closures concurrentes en tests

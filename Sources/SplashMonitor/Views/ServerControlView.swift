@@ -31,6 +31,12 @@ public struct ServerControlView: View {
         return ModelIDValidator.rejectionReason(value)
     }
     
+    /// Error de validación de flags CLI adicionales (P-03).
+    private var customFlagsError: String? {
+        let (_, err) = ServerCLIValidator.validateAndTokenize(service.customServerFlags)
+        return err
+    }
+    
     public var body: some View {
         VStack(spacing: 12) {
             // 0. Dependency missing alert if needed
@@ -619,7 +625,7 @@ public struct ServerControlView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(.purple)
                             .controlSize(.regular)
-                            .disabled(targetModel.isEmpty || customModelError != nil)
+                            .disabled(targetModel.isEmpty || customModelError != nil || customFlagsError != nil)
                             .fixedSize()
                         }
                     } else {
@@ -633,11 +639,42 @@ public struct ServerControlView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
                         .controlSize(.regular)
-                        .disabled(targetModel.isEmpty)
+                        .disabled(targetModel.isEmpty || customFlagsError != nil)
                         .fixedSize()
                     }
                 }
             }
+            
+            // Flags CLI adicionales (ej. --no-webui --max-cache-disk 50GB)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    Image(systemName: "terminal")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                    Text(tr(es: "Flags CLI adicionales:", en: "Additional CLI flags:"))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    if let err = customFlagsError {
+                        Text(err)
+                            .font(.system(size: 9))
+                            .foregroundColor(.red)
+                            .lineLimit(1)
+                    }
+                }
+                
+                TextField(
+                    tr(es: "Ej: --no-webui --max-cache-disk 50GB", en: "e.g. --no-webui --max-cache-disk 50GB"),
+                    text: $service.customServerFlags
+                )
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 10, design: .monospaced))
+                .help(tr(
+                    es: "Flags y opciones adicionales que se pasan directamente al final del comando 'splash serve'.",
+                    en: "Additional flags and options passed directly at the end of the 'splash serve' command."
+                ))
+            }
+            .padding(.top, 2)
             
             // Background / Silent mode & logs options
             HStack {

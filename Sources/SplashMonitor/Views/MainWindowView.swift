@@ -539,6 +539,23 @@ public struct MainWindowView: View {
                      : "Disables vision projector (mmproj) loading. Required for GGUF coder models (like Tiel-Coder, Qwopus, Cyber-Tiel) that lack image weights.")
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(loc.isSpanish ? "Flags CLI Adicionales de Splash:" : "Additional Splash CLI Flags:")
+                        .font(.system(size: 11, weight: .medium))
+                    
+                    TextField(loc.isSpanish ? "ej. --no-webui --max-cache-disk 50GB" : "e.g. --no-webui --max-cache-disk 50GB", text: $service.customServerFlags)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11, design: .monospaced))
+                    
+                    Text(loc.isSpanish
+                         ? "Parámetros y banderas arbitrarias adicionales que se pasarán al final de 'splash serve'. Se sanean automáticamente para evitar inyección de comandos."
+                         : "Arbitrary additional flags passed directly to 'splash serve'. Automatically sanitized to prevent command injection.")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(14)
             .background(Color(nsColor: .controlBackgroundColor))

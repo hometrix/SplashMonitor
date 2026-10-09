@@ -157,6 +157,19 @@ public struct MenuBarView: View {
             .buttonStyle(.plain)
             .help(tr(es: "Cambiar idioma", en: "Switch language"))
             
+            // Stop server button if running
+            if service.isRunning {
+                Button {
+                    service.stopServer()
+                } label: {
+                    Image(systemName: "stop.circle.fill")
+                        .font(.system(size: 13))
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
+                .help(tr(es: "Detener Servidor Splash", en: "Stop Splash Server"))
+            }
+            
             // Open full window button
             Button {
                 openMainWindow()
@@ -186,7 +199,7 @@ public struct MenuBarView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help(tr(es: "Salir de Splash Monitor", en: "Quit Splash Monitor"))
+            .help(tr(es: "Salir de Splash Monitor (Cerrar app)", en: "Quit Splash Monitor (Exit app)"))
         }
     }
     
@@ -292,11 +305,20 @@ public struct MenuBarView: View {
     }
     
     private func openMainWindow() {
-        openWindow(id: "main")
         NSApp.activate(ignoringOtherApps: true)
-        for window in NSApp.windows where window.canBecomeMain {
-            window.makeKeyAndOrderFront(nil)
+        if let existing = NSApp.windows.first(where: { $0.canBecomeMain && !($0 is NSPanel) }) {
+            if existing.isMiniaturized {
+                existing.deminiaturize(nil)
+            }
+            existing.makeKeyAndOrderFront(nil)
             return
+        }
+        openWindow(id: "main")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            for window in NSApp.windows where window.canBecomeMain && !(window is NSPanel) {
+                window.makeKeyAndOrderFront(nil)
+                return
+            }
         }
     }
 }
