@@ -17,17 +17,26 @@ final class ScreenshotGeneratorTests: XCTestCase {
         service.isSplashInstalled = true
         service.installedAgents = ["claude", "claude-cowork", "opencode", "codex", "hermes"]
         
+        service.speedHistory = [52.0, 68.4, 82.1, 94.5, 102.3, 98.0, 104.2, 108.5]
+        service.languageOnly = false
+        
         service.installedModels = [
             InstalledSplashModel(
-                repoId: "mlx-community/Qwen3.8-27B-4bit",
-                localPath: URL(fileURLWithPath: "/tmp/qwen"),
-                diskSizeBytes: 16_106_127_360,
+                repoId: "incoai/Qwen3.6-35B-A3B-Splash",
+                localPath: URL(fileURLWithPath: "/tmp/qwen36"),
+                diskSizeBytes: 21_474_836_480,
                 isCurrentlyActive: true
             ),
             InstalledSplashModel(
-                repoId: "incoai/Qwen3.8-27B-Splash",
-                localPath: URL(fileURLWithPath: "/tmp/splash"),
-                diskSizeBytes: 15_032_385_536,
+                repoId: "unsloth/Ornith-1.5-122B-GGUF:UD-Q4_K_XL",
+                localPath: URL(fileURLWithPath: "/tmp/ornith"),
+                diskSizeBytes: 68_719_476_736,
+                isCurrentlyActive: false
+            ),
+            InstalledSplashModel(
+                repoId: "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:IQ3_S",
+                localPath: URL(fileURLWithPath: "/tmp/flashnext"),
+                diskSizeBytes: 12_884_901_888,
                 isCurrentlyActive: false
             )
         ]
