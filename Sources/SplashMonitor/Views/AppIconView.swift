@@ -8,9 +8,39 @@ public struct AppIconView: View {
         self.size = size
     }
     
-    public var body: some View {
+    private var loadedIconImage: NSImage? {
+        // 1. Bundle.main o Bundle.module
         if let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
-           let nsImage = NSImage(contentsOf: iconURL) {
+           let img = NSImage(contentsOf: iconURL) {
+            return img
+        }
+        if let pngURL = Bundle.main.url(forResource: "app_icon_droplet_transparent", withExtension: "png"),
+           let img = NSImage(contentsOf: pngURL) {
+            return img
+        }
+        
+        // 2. Rutas relativas del repositorio para ejecución en tests y previsualización
+        let candidates = [
+            "Resources/app_icon_droplet_transparent.png",
+            "Resources/AppIcon.icns",
+            "../Resources/app_icon_droplet_transparent.png",
+            "../Resources/AppIcon.icns",
+            "/Users/hometrix/ProyectosJMGREPDEV/SplashMonitor/Resources/app_icon_droplet_transparent.png",
+            "/Users/hometrix/ProyectosJMGREPDEV/SplashMonitor/Resources/AppIcon.icns"
+        ]
+        
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: path),
+               let img = NSImage(contentsOfFile: path) {
+                return img
+            }
+        }
+        
+        return nil
+    }
+    
+    public var body: some View {
+        if let nsImage = loadedIconImage {
             Image(nsImage: nsImage)
                 .resizable()
                 .scaledToFit()

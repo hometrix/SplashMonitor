@@ -26,8 +26,8 @@
 <br/>
 
 <div align="center">
-  <img src="screenshots/module-server.png" width="760" alt="Splash Monitor Server and Agents Launcher" />
-  <p><b>🕹️ Servidor de Inferencia Local y Lanzadores de Agentes (Claude Cowork, Claude Code, OpenCode, Codex, Hermes, Pi, DeepSeek Harness)</b></p>
+  <img src="screenshots/es/module-dashboard.png" width="780" alt="Splash Monitor - Dashboard de Inferencia Local en Apple Silicon" />
+  <p><b>⚡ Monitor de Inferencia Local Splash en Apple Silicon (M3/M4/M5) con Métricas en Vivo de Tokens, Velocidad y Memoria Metal</b></p>
 </div>
 
 <br/>
@@ -137,52 +137,52 @@ Cada módulo de **Splash Monitor** está optimizado para la experiencia nativa d
 <div align="center">
 
 #### 1. 🕹️ Servidor y Lanzadores de Agentes (con Claude Cowork y DeepSeek Harness)
-<img src="screenshots/module-server.png" width="850" alt="Servidor y Agentes de Código" />
+<img src="screenshots/es/module-server.png" width="850" alt="Servidor y Agentes de Código" />
 <p><b>Módulo de Control del Servidor:</b> Inicia y detiene el servidor Splash en un solo clic, cambia el modelo en caliente, configura el puerto, estado recurrente GDN en BF16 (-50% RAM), presupuesto de tokens de razonamiento, caché SSD persistente y lanza agentes autónomos: <b>Claude Cowork</b> (activación de app nativa con aliases para evitar errores 404), <b>Claude Code CLI</b>, <b>OpenCode</b>, <b>Codex</b>, <b>Hermes</b>, <b>Pi Agent</b> y <b>DeepSeek Harness (`dsh`)</b>.</p>
 
 <br/>
 
 #### 2. 📊 Dashboard de Tokens y Rendimiento Metal
-<img src="screenshots/module-dashboard.png" width="850" alt="Dashboard de Tokens y Rendimiento Metal" />
+<img src="screenshots/es/module-dashboard.png" width="850" alt="Dashboard de Tokens y Rendimiento Metal" />
 <p><b>Módulo de Rendimiento en Tiempo Real:</b> Monitorea velocidades de generación de tokens (DECODE y PREFILL en tok/s), ratio de acierto y reutilización de KV Cache, deduplicación de tokens, aceptación especulativa DFlash 2, latencias TTFT/ITL y uso de memoria unificada Metal (M3/M4/M5).</p>
 
 <br/>
 
 #### 3. 🔌 Aplicaciones y Clientes Conectados
-<img src="screenshots/module-connectedApps.png" width="850" alt="Apps Conectadas y Clientes Activos" />
+<img src="screenshots/es/module-connectedApps.png" width="850" alt="Apps Conectadas y Clientes Activos" />
 <p><b>Módulo de Clientes Conectados:</b> Inspección automática de conexiones TCP activas contra el puerto de inferencia, reconociendo clientes como <b>Claude Desktop / Cowork</b>, <b>DeepSeek Harness</b>, Cursor IDE, VS Code y Chatbots con sus íconos nativos y estado de transmisión.</p>
 
 <br/>
 
 #### 4. 📖 Guía Rápida de Conexión y Gateway
-<img src="screenshots/module-connectedApps-guide.png" width="850" alt="Guía de Conexión de Clientes" />
+<img src="screenshots/es/module-connectedApps-guide.png" width="850" alt="Guía de Conexión de Clientes" />
 <p><b>Módulo de Guía de Conexión:</b> Pasos y comandos de un clic para configurar el Gateway local en Claude Desktop, Cursor IDE, VS Code (Cline/Continue), Chatbox y scripts Python (OpenAI SDK / LangChain).</p>
 
 <br/>
 
 #### 5. 📦 Gestor de Modelos y Telemetría de Descargas
-<img src="screenshots/module-models.png" width="850" alt="Gestor de Modelos de Hugging Face" />
+<img src="screenshots/es/module-models.png" width="850" alt="Gestor de Modelos de Hugging Face" />
 <p><b>Módulo de Modelos:</b> Control de modelos locales en disco con espacio utilizado, cambio en caliente y exploración del catálogo de Hugging Face con soporte para cuantizaciones oficiales NVIDIA (NVFP4 / FP8), variantes GGUF, guía asistida para repositorios protegidos (403 Gated) y modo <code>--language-only</code> para modelos de código y texto.</p>
 
-<img src="screenshots/module-modelDownload.png" width="850" alt="Telemetría de Descarga en Vivo" />
+<img src="screenshots/es/module-modelDownload.png" width="850" alt="Telemetría de Descarga en Vivo" />
 <p><b>Telemetría de Descarga en Tiempo Real:</b> Medición en vivo de la tasa de transferencia en MB/s (<code>⚡️ 34.8 MB/s</code>), barra de progreso continuo, contador exacto de GB descargados frente al total esperado y detección de fases (acelerador especulativo DFlash2, pesos del modelo y ensamblado Splash).</p>
 
 <br/>
 
 #### 6. 🧪 Test y Diagnóstico de Modelos (Model Lab)
-<img src="screenshots/module-modelTesting.png" width="850" alt="Test y Diagnóstico de Modelos" />
+<img src="screenshots/es/module-modelTesting.png" width="850" alt="Test y Diagnóstico de Modelos" />
 <p><b>Módulo de Test y Diagnóstico:</b> Suite completa de verificación en un clic con Smoke Test (salud del servidor, disponibilidad Metal, plantilla Jinja, OpenAI Chat, Anthropic Messages y llamadas a herramientas/JSON), Benchmarking de velocidad con cálculo del factor de aceleración del KV Cache y Playground interactivo de inferencia local.</p>
 
 <br/>
 
 #### 7. ⚙️ Configuración del Sistema
-<img src="screenshots/module-settings.png" width="850" alt="Configuración del Sistema" />
+<img src="screenshots/es/module-settings.png" width="850" alt="Configuración del Sistema" />
 <p><b>Módulo de Ajustes:</b> Selector de idioma (Español Dominicano 🇩🇴 / English 🇬🇧 / macOS automático), configuración del ícono en la barra de menú superior de macOS y frecuencia de refresco.</p>
 
 <br/>
 
 #### 8. ℹ️ Acerca de Splash Monitor
-<img src="screenshots/module-about.png" width="850" alt="Acerca de Splash Monitor" />
+<img src="screenshots/es/module-about.png" width="850" alt="Acerca de Splash Monitor" />
 <p><b>Módulo Informativo:</b> Información de versión (v1.1.0-beta), arquitectura nativa en Swift 6 y Metal, licencia abierta MIT y créditos de autoría de Joan Gregorio Pérez (JMGREP Developers).</p>
 </div>
 
@@ -586,52 +586,52 @@ Every module of **Splash Monitor** is designed and optimized for a native Apple 
 <div align="center">
 
 #### 1. 🕹️ Server Controls & Agent Launchers (with Claude Cowork & DeepSeek Harness)
-<img src="screenshots/module-server.png" width="850" alt="Server Controls and Code Agent Launchers" />
+<img src="screenshots/en/module-server.png" width="850" alt="Server Controls and Code Agent Launchers" />
 <p><b>Server Control Module:</b> Start and stop the Splash server with one click, hot-swap models without restarting, configure custom ports, GDN recurrent state format in BF16 (-50% RAM), reasoning token budget, persistent SSD prefix cache, and launch autonomous coding agents: <b>Claude Cowork</b> (native AppKit launch with model aliases to prevent 404 errors), <b>Claude Code CLI</b>, <b>OpenCode</b>, <b>Codex</b>, <b>Hermes</b>, <b>Pi Agent</b>, and <b>DeepSeek Harness (`dsh`)</b>.</p>
 
 <br/>
 
 #### 2. 📊 Real-Time Token & Metal Performance Dashboard
-<img src="screenshots/module-dashboard.png" width="850" alt="Real-Time Token & Metal Performance Dashboard" />
+<img src="screenshots/en/module-dashboard.png" width="850" alt="Real-Time Token & Metal Performance Dashboard" />
 <p><b>Real-Time Performance Module:</b> Live token generation speed telemetry (DECODE and PREFILL in tok/s), KV Cache hit ratio and token reuse, token deduplication metrics, DFlash 2 speculative decoding acceptance rates, TTFT/ITL latencies, and Apple Silicon Metal unified memory usage (M3/M4/M5).</p>
 
 <br/>
 
 #### 3. 🔌 Connected Applications & Active TCP Clients
-<img src="screenshots/module-connectedApps.png" width="850" alt="Connected Applications and Active Clients" />
+<img src="screenshots/en/module-connectedApps.png" width="850" alt="Connected Applications and Active Clients" />
 <p><b>Connected Clients Module:</b> Automatic inspection of active TCP sockets against the inference port, recognizing clients such as <b>Claude Desktop / Cowork</b>, <b>DeepSeek Harness</b>, Cursor IDE, VS Code, and Chatbots with their native macOS application icons and stream state.</p>
 
 <br/>
 
 #### 4. 📖 Client Connection Guide & Local Gateway
-<img src="screenshots/module-connectedApps-guide.png" width="850" alt="Client Connection Guide" />
+<img src="screenshots/en/module-connectedApps-guide.png" width="850" alt="Client Connection Guide" />
 <p><b>Connection Guide Module:</b> Quick setup instructions and one-click copyable configuration snippets for Claude Desktop, Cursor IDE, VS Code (Cline/Continue), Chatbox, and Python scripts (OpenAI SDK / LangChain).</p>
 
 <br/>
 
 #### 5. 📦 Hugging Face Model Manager & Download Telemetry
-<img src="screenshots/module-models.png" width="850" alt="Hugging Face Local Model Manager" />
+<img src="screenshots/en/module-models.png" width="850" alt="Hugging Face Local Model Manager" />
 <p><b>Model Management Module:</b> Disk footprint inspection for local models, hot-swap deployment, and Hugging Face catalog exploration with support for official NVIDIA quantized models (NVFP4 / FP8), GGUF variants, assisted guidance for protected repositories (403 Gated Models), and <code>--language-only</code> mode for Coder/text models.</p>
 
-<img src="screenshots/module-modelDownload.png" width="850" alt="Live Download Telemetry" />
+<img src="screenshots/en/module-modelDownload.png" width="850" alt="Live Download Telemetry" />
 <p><b>Real-Time Download Telemetry:</b> Live transfer speed measurement in MB/s (<code>⚡️ 34.8 MB/s</code>), continuous progress bar, exact GB downloaded counter vs expected total, and phase detection (DFlash2 speculative accelerator, model weights, and Splash engine assembly).</p>
 
 <br/>
 
 #### 6. 🧪 Model Testing & Diagnostics Lab
-<img src="screenshots/module-modelTesting.png" width="850" alt="Model Testing & Diagnostics Lab" />
+<img src="screenshots/en/module-modelTesting.png" width="850" alt="Model Testing & Diagnostics Lab" />
 <p><b>Model Testing Module:</b> Complete one-click verification suite with Smoke Testing (server health, Metal engine readiness, Jinja templates, OpenAI Chat, Anthropic Messages, and Tool Calling/JSON validation), Metal speed benchmarking with KV Cache speedup factor calculation, and an interactive local inference Playground.</p>
 
 <br/>
 
 #### 7. ⚙️ System Preferences & Settings
-<img src="screenshots/module-settings.png" width="850" alt="System Preferences and Settings" />
+<img src="screenshots/en/module-settings.png" width="850" alt="System Preferences and Settings" />
 <p><b>Settings Module:</b> Language selector (Dominican Spanish 🇩🇴 / English 🇬🇧 / macOS auto-sync), customizable macOS menu bar item display modes, and background polling interval controls.</p>
 
 <br/>
 
 #### 8. ℹ️ About Splash Monitor
-<img src="screenshots/module-about.png" width="850" alt="About Splash Monitor" />
+<img src="screenshots/en/module-about.png" width="850" alt="About Splash Monitor" />
 <p><b>About Module:</b> Version information (v1.1.0-beta), native Swift 6 and Metal architecture details, MIT open-source license, and author credits for Joan Gregorio Pérez (JMGREP Developers).</p>
 
 </div>
