@@ -5,6 +5,47 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.1.0-beta] - 2026-10-27
+
+Versión menor destacada con **internacionalización bilingüe al 100% (Español / Inglés)**, monitor interactivo del **ciclo de vida de inferencia en tiempo real (PREFILL ➔ DECODE ➔ IDLE)** en el Dashboard, modalidad **multimodal por defecto (Visión + Texto)** con conmutación inteligente a `--language-only` para modelos de código, y notificaciones nativas de macOS. Resuelve los issues de la comunidad **#5** y **#6**.
+
+### 🚀 Novedades y Características
+
+- **🌐 100% Internacionalización Bilingüe (Español / Inglés — Issue #5):**
+  - Cobertura completa y fluida en ambas lenguas para toda la interfaz: controles del servidor, validadores de modelos (`ModelIDValidator`), alertas de rechazo accionables, modales de confirmación y notificaciones del sistema.
+  - Soporte de idioma manual (Español 🇩🇴 / English 🇬🇧) o sincronización automática con la preferencia de idioma de macOS.
+- **⚡ Monitor en Vivo del Ciclo de Vida de Inferencia (Issue #6):**
+  - Tarjeta interactiva en tiempo real en el Dashboard que visualiza la fase exacta de inferencia:
+    - **`PREFILL` (Azul):** Procesamiento de prompt de entrada, evaluación de tasa de acierto y reutilización de KV Cache con medidor independiente de tok/s.
+    - **`DECODE` (Verde):** Generación continua de tokens de respuesta con velocidad y contador de tokens generados en vivo.
+    - **`QUEUED / IDLE`:** Indicador de ranuras de inferencia en cola o estado disponible en espera de peticiones.
+- **👁️ Modalidad Multimodal por Defecto (Visión + Texto):**
+  - Splash arranca por defecto con visión activada sin necesidad de ajustar parámetros manuales.
+  - Auto-fallback inteligente: si un modelo puramente de código carece de proyector visual (`mmproj`), el monitor conmuta automáticamente a `--language-only` sin interrupciones ni fallos de inicio.
+- **🔔 Notificaciones Nativas del Sistema y Auto-Arranque:**
+  - Servicio centralizado de notificaciones con `UNUserNotificationCenter` para avisar cuando el servidor queda listo o al finalizar la descarga de modelos pesados.
+  - Integración moderna de auto-inicio en inicio de sesión mediante `SMAppService` de Apple.
+- **🛡️ Suite Completa de 120 Pruebas Automatizadas (100% passing):**
+  - Protección de inyección de comandos en shell, centinela de memoria Metal (`SystemMemoryPressureSentinel`), aislamiento de concurrencia en `@MainActor` y verificación criptográfica SHA-256 de la distribución.
+
+---
+
+## [1.0.10-beta] - 2026-10-26
+
+Versión de compatibilidad con **Splash 1.4.1**, soporte de modelos **Ornith-1.5-122B** y **Flint 40B-A2.5B MoE**, y nuevo **Modo Solo Barra de Menú** en macOS.
+
+### 🚀 Novedades y Características
+
+- **📌 Modo Solo Barra de Menú (Menu Bar Only Mode — Issue #4):**
+  - Opción en Configuración para ocultar el ícono del Dock al cerrar la ventana principal (`Cmd+Q`), manteniendo el servicio activo exclusivamente en la barra de menú superior.
+  - Atajo `Cmd+Shift+Q` o menú contextual para salida completa de la aplicación.
+- **🤖 Compatibilidad con Splash 1.4.1:**
+  - Detección y catálogo de modelos para `unsloth/Ornith-1.5-122B-GGUF:UD-Q4_K_XL` y `ornith-ai/Ornith-1.5-122B-MLX-4bit`.
+  - Soporte de arquitectura MoE `unsloth/flint-GGUF:UD-Q4_K_XL` (~190 tok/s en Apple Silicon).
+  - Búsqueda dinámica con fetch a la API de Hugging Face para variantes de Ornith y Flint.
+
+---
+
 ## [1.0.9-beta] - 2026-10-21
 
 Versión mayor de compatibilidad con **Splash 1.4.0**, soporte para arquitectura **Qwen3.8-Flash-Next**, contextos masivos de hasta **1M tokens (YaRN)**, streaming de expertos MoE desde SSD (`--expert-memory`), verificación especulativa de filas (`--verify-rows`) y nuevas métricas de telemetría de streaming y derrame KV.
