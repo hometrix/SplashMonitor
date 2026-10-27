@@ -15,7 +15,7 @@ defaults write "$DOMAIN" thinkingTokenBudget -string "8K"
 defaults write "$DOMAIN" persistentCache -bool true
 defaults write "$DOMAIN" maxContext -string "128K"
 defaults write "$DOMAIN" idleRelease -string "off"
-defaults write "$DOMAIN" languageOnly -bool true
+defaults write "$DOMAIN" languageOnly -bool false
 defaults write "$DOMAIN" maxMemory -string "auto"
 defaults write "$DOMAIN" verifyRows -string "auto"
 defaults write "$DOMAIN" expertMemory -string "auto"
@@ -38,7 +38,7 @@ echo "   🤔 Thinking Budget:   8K"
 echo "   💾 Caché SSD:         Persistente (--persistent-cache)"
 echo "   🧠 Contexto:          128K"
 echo "   ⏳ Inactividad:       off (Siempre en RAM)"
-echo "   👁️  Modalidad:         Solo Texto / Código (--language-only)"
+echo "   👁️  Modalidad:         Visión + Texto (Multimodal por defecto)"
 echo "   🎯 Verificación MoE:  auto (+13% a +42% velocidad)"
 echo "   💽 Memoria Expertos:  auto (Streaming dinámico MoE)"
 echo "   🔌 Puerto:            8005"

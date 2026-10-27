@@ -126,7 +126,7 @@ public class SplashService: ObservableObject {
         self.persistentCache = true
         self.maxContext = "128K"
         self.idleRelease = "off"
-        self.languageOnly = true
+        self.languageOnly = false
         self.maxMemory = "auto"
         self.verifyRows = "auto"
         self.expertMemory = "auto"
@@ -149,7 +149,7 @@ public class SplashService: ObservableObject {
         defaults.set(true, forKey: "persistentCache")
         defaults.set("128K", forKey: "maxContext")
         defaults.set("off", forKey: "idleRelease")
-        defaults.set(true, forKey: "languageOnly")
+        defaults.set(false, forKey: "languageOnly")
         defaults.set("auto", forKey: "maxMemory")
         defaults.set("auto", forKey: "verifyRows")
         defaults.set("auto", forKey: "expertMemory")
@@ -1173,9 +1173,9 @@ public class SplashService: ObservableObject {
         downloadProgressFraction = nil
         downloadPhase = "Iniciando descarga y preparación..."
         
-        let textOnlyKeywords = ["coder", "code", "uncensored", "optiq", "mtp", "instruct", "chat", "deepseek", "base"]
+        let textOnlyKeywords = ["coder", "magicoder", "starcoder", "codellama"]
         let autoLangOnly = textOnlyKeywords.contains { effectiveRepoId.lowercased().contains($0) }
-        let initialLangOnly = languageOnly ?? autoLangOnly
+        let initialLangOnly = languageOnly ?? (autoLangOnly ? true : false)
         
         if effectiveRepoId != repoId {
             installLogs = [

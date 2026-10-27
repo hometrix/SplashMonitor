@@ -338,7 +338,7 @@ final class ServerOptionsTests: XCTestCase {
         service.persistentCache = false
         service.maxContext = "16K"
         service.idleRelease = "1m"
-        service.languageOnly = false
+        service.languageOnly = true
         service.maxMemory = "16G"
         service.lastUsedPort = 9999
         service.listenOnAllInterfaces = false
@@ -356,7 +356,7 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(service.persistentCache)
         XCTAssertEqual(service.maxContext, "128K")
         XCTAssertEqual(service.idleRelease, "off")
-        XCTAssertTrue(service.languageOnly)
+        XCTAssertFalse(service.languageOnly)
         XCTAssertEqual(service.maxMemory, "auto")
         XCTAssertEqual(service.verifyRows, "auto")
         XCTAssertEqual(service.expertMemory, "auto")
@@ -375,7 +375,7 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(defaults.bool(forKey: "persistentCache"))
         XCTAssertEqual(defaults.string(forKey: "maxContext"), "128K")
         XCTAssertEqual(defaults.string(forKey: "idleRelease"), "off")
-        XCTAssertTrue(defaults.bool(forKey: "languageOnly"))
+        XCTAssertFalse(defaults.bool(forKey: "languageOnly"))
         XCTAssertEqual(defaults.string(forKey: "maxMemory"), "auto")
         XCTAssertEqual(defaults.string(forKey: "verifyRows"), "auto")
         XCTAssertEqual(defaults.string(forKey: "expertMemory"), "auto")
