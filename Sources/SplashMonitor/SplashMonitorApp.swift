@@ -131,6 +131,26 @@ struct SplashMonitorApp: App {
                     }
                 }
             }
+            
+            // Menú Ver / View (Zoom In, Zoom Out, Reset Zoom) estilo macOS / VS Code
+            CommandGroup(after: .toolbar) {
+                Menu(loc.isSpanish ? "Apariencia" : "Appearance") {
+                    Button(loc.isSpanish ? "Aumentar tamaño de letra" : "Zoom In") {
+                        TextZoomManager.shared.zoomIn()
+                    }
+                    .keyboardShortcut("+", modifiers: .command)
+                    
+                    Button(loc.isSpanish ? "Reducir tamaño de letra" : "Zoom Out") {
+                        TextZoomManager.shared.zoomOut()
+                    }
+                    .keyboardShortcut("-", modifiers: .command)
+                    
+                    Button(loc.isSpanish ? "Restablecer tamaño (100%)" : "Reset Zoom") {
+                        TextZoomManager.shared.resetZoom()
+                    }
+                    .keyboardShortcut("0", modifiers: .command)
+                }
+            }
             // Override the standard Quit menu item to support Menu Bar Only mode
             CommandGroup(replacing: .appTermination) {
                 Button(loc.isSpanish ? "Salir de Splash Monitor" : "Quit Splash Monitor") {

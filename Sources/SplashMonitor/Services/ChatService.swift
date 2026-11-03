@@ -116,11 +116,13 @@ public final class ChatService: ObservableObject {
     
     public func sendMessage(
         _ text: String,
+        attachments: [ChatAttachment] = [],
         port: Int,
-        model: String
+        model: String,
+        supportsVision: Bool = false
     ) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !isGenerating else { return }
+        guard (!trimmed.isEmpty || !attachments.isEmpty), !isGenerating else { return }
         
         // Asegurar sesión
         if currentSession == nil {
@@ -130,12 +132,18 @@ public final class ChatService: ObservableObject {
         
         // Actualizar título de la conversación si es el primer mensaje
         if sessions[sessionIndex].messages.isEmpty {
-            let autoTitle = trimmed.count > 30 ? String(trimmed.prefix(30)) + "..." : trimmed
+            let titleSource = trimmed.isEmpty ? (attachments.first?.name ?? "Archivo") : trimmed
+            let autoTitle = titleSource.count > 30 ? String(titleSource.prefix(30)) + "..." : titleSource
             sessions[sessionIndex].title = autoTitle
         }
         
-        // Mensaje de usuario
-        let userMessage = ChatMessage(role: .user, content: trimmed, isComplete: true)
+        // Mensaje de usuario con adjuntos
+        let userMessage = ChatMessage(
+            role: .user,
+            content: trimmed,
+            attachments: attachments,
+            isComplete: true
+        )
         sessions[sessionIndex].messages.append(userMessage)
         sessions[sessionIndex].modelId = model
         sessions[sessionIndex].updatedAt = Date()
@@ -154,7 +162,7 @@ public final class ChatService: ObservableObject {
         streamingError = nil
         currentTokensPerSecond = 0.0
         
-        let messagesPayload = buildMessagesPayload(for: sessions[sessionIndex])
+        let messagesPayload = buildMessagesPayload(for: sessions[sessionIndex], supportsVision: supportsVision)
         
         activeTask?.cancel()
         activeTask = Task { [weak self] in
@@ -180,8 +188,8 @@ public final class ChatService: ObservableObject {
         saveSessionsToDisk()
     }
     
-    private func buildMessagesPayload(for session: ChatSession) -> [[String: String]] {
-        var payload: [[String: String]] = []
+    private func buildMessagesPayload(for session: ChatSession, supportsVision: Bool) -> [[String: Any]] {
+        var payload: [[String: Any]] = []
         
         // Prompt de sistema
         let sys = parameters.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -191,7 +199,36 @@ public final class ChatService: ObservableObject {
         
         // Historial excluyendo el último placeholder incompleto del asistente
         for msg in session.messages.dropLast() {
-            if !msg.content.isEmpty {
+            if msg.role == .user {
+                var userContentText = msg.content
+                
+                // Si tiene adjuntos de texto/código, anexarlos al contenido
+                for att in msg.attachments where !att.isImage {
+                    if let code = att.textContent {
+                        userContentText += "\n\n---\n**Archivo adjunto: \(att.name)**\n```\n\(code)\n```"
+                    }
+                }
+                
+                let imageAttachments = msg.attachments.filter { $0.isImage && $0.base64Data != nil }
+                
+                if supportsVision && !imageAttachments.isEmpty {
+                    var parts: [[String: Any]] = []
+                    if !userContentText.isEmpty {
+                        parts.append(["type": "text", "text": userContentText])
+                    }
+                    for img in imageAttachments {
+                        if let b64 = img.base64Data {
+                            parts.append([
+                                "type": "image_url",
+                                "image_url": ["url": "data:\(img.mimeType);base64,\(b64)"]
+                            ])
+                        }
+                    }
+                    payload.append(["role": "user", "content": parts])
+                } else {
+                    payload.append(["role": "user", "content": userContentText])
+                }
+            } else if !msg.content.isEmpty {
                 payload.append(["role": msg.role.rawValue, "content": msg.content])
             }
         }
@@ -202,7 +239,7 @@ public final class ChatService: ObservableObject {
     private func executeStreamingRequest(
         port: Int,
         model: String,
-        messages: [[String: String]],
+        messages: [[String: Any]],
         sessionIndex: Int,
         assistantMessageId: UUID
     ) async {

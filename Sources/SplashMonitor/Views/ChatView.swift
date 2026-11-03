@@ -6,6 +6,7 @@ public struct ChatView: View {
     @ObservedObject var service: SplashService
     @ObservedObject private var chatService = ChatService.shared
     @ObservedObject private var loc = Localization.shared
+    @ObservedObject private var zoomManager = TextZoomManager.shared
     
     @State private var inputText: String = ""
     @State private var showingSettingsSheet: Bool = false
@@ -13,6 +14,7 @@ public struct ChatView: View {
     @State private var editingSessionId: UUID?
     @State private var editingTitleText: String = ""
     @State private var exportSuccessToast: Bool = false
+    @State private var pendingAttachments: [ChatAttachment] = []
     
     public init(service: SplashService) {
         self.service = service
@@ -120,6 +122,46 @@ public struct ChatView: View {
             }
             
             Spacer()
+            
+            // Selector de Zoom A- / A+
+            HStack(spacing: 2) {
+                Button {
+                    zoomManager.zoomOut()
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 10, weight: .bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(loc.isSpanish ? "Reducir tamaño de letra (⌘-)" : "Zoom Out (⌘-)")
+                
+                Text(zoomManager.formattedPercentage)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary)
+                    .frame(minWidth: 36)
+                    .onTapGesture {
+                        zoomManager.resetZoom()
+                    }
+                    .help(loc.isSpanish ? "Clic para restablecer al 100%" : "Click to reset to 100%")
+                
+                Button {
+                    zoomManager.zoomIn()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 10, weight: .bold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(loc.isSpanish ? "Aumentar tamaño de letra (⌘+)" : "Zoom In (⌘+)")
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            )
             
             // Botón Exportar a Markdown
             Button {
@@ -274,14 +316,64 @@ public struct ChatView: View {
     // MARK: - Barra de Entrada
     
     private func handleSendMessage() {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, service.isRunning, !chatService.isGenerating else { return }
+        guard (!inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !pendingAttachments.isEmpty),
+              service.isRunning, !chatService.isGenerating else { return }
         let text = inputText
+        let attachments = pendingAttachments
         inputText = ""
+        pendingAttachments = []
+        
         chatService.sendMessage(
             text,
+            attachments: attachments,
             port: service.activePort,
-            model: service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
+            model: service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel,
+            supportsVision: !service.languageOnly
         )
+    }
+    
+    private func selectFilesToAttach() {
+        let openPanel = NSOpenPanel()
+        openPanel.canChooseFiles = true
+        openPanel.canChooseDirectories = false
+        openPanel.allowsMultipleSelection = true
+        openPanel.allowedContentTypes = [.text, .plainText, .sourceCode, .image, .json]
+        
+        openPanel.begin { result in
+            if result == .OK {
+                for url in openPanel.urls {
+                    let name = url.lastPathComponent
+                    let ext = url.pathExtension.lowercased()
+                    let isImg = ["png", "jpg", "jpeg", "webp", "gif"].contains(ext)
+                    
+                    if isImg {
+                        if let data = try? Data(contentsOf: url) {
+                            let b64 = data.base64EncodedString()
+                            let mime = ext == "png" ? "image/png" : "image/jpeg"
+                            let att = ChatAttachment(
+                                name: name,
+                                sizeBytes: Int64(data.count),
+                                isImage: true,
+                                mimeType: mime,
+                                base64Data: b64
+                            )
+                            pendingAttachments.append(att)
+                        }
+                    } else {
+                        if let text = try? String(contentsOf: url, encoding: .utf8) {
+                            let att = ChatAttachment(
+                                name: name,
+                                sizeBytes: Int64(text.utf8.count),
+                                isImage: false,
+                                mimeType: "text/plain",
+                                textContent: text
+                            )
+                            pendingAttachments.append(att)
+                        }
+                    }
+                }
+            }
+        }
     }
     
     private func exportConversation() {
@@ -304,25 +396,65 @@ public struct ChatView: View {
     }
     
     private var inputControlsBar: some View {
-        VStack(spacing: 8) {
-            HStack(alignment: .bottom, spacing: 8) {
+        VStack(spacing: 6) {
+            // Previsualización de archivos adjuntos pendientes
+            if !pendingAttachments.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(pendingAttachments) { att in
+                            HStack(spacing: 4) {
+                                Image(systemName: att.isImage ? "photo.fill" : "doc.text.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.accentColor)
+                                Text(att.name)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Button {
+                                    pendingAttachments.removeAll(where: { $0.id == att.id })
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(nsColor: .controlBackgroundColor))
+                            .cornerRadius(6)
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+            
+            // Caja de Entrada Flotante Estilo Compacto
+            HStack(alignment: .center, spacing: 8) {
+                // Botón Adjuntar Archivo 📎
+                Button {
+                    selectFilesToAttach()
+                } label: {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 15))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(loc.isSpanish ? "Adjuntar código, texto o imágenes para análisis" : "Attach code, text or images for analysis")
+                
+                // Campo de entrada
                 TextEditor(text: $inputText)
-                    .font(.system(size: 12, design: .default))
-                    .frame(minHeight: 36, maxHeight: 100)
-                    .padding(6)
-                    .background(Color(nsColor: .controlBackgroundColor))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                    )
+                    .font(.body)
+                    .frame(minHeight: 24, maxHeight: 85)
+                    .padding(.horizontal, 4)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
                 
                 if chatService.isGenerating {
                     Button {
                         chatService.cancelGeneration()
                     } label: {
                         Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 24))
+                            .font(.system(size: 26))
                             .foregroundColor(.red)
                     }
                     .buttonStyle(.plain)
@@ -332,18 +464,27 @@ public struct ChatView: View {
                         handleSendMessage()
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !service.isRunning ? .secondary.opacity(0.4) : .accentColor)
+                            .font(.system(size: 26))
+                            .foregroundColor((inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty) || !service.isRunning ? .secondary.opacity(0.3) : .accentColor)
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut(.return, modifiers: [.command])
-                    .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !service.isRunning)
+                    .disabled((inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty) || !service.isRunning)
                     .help(loc.isSpanish ? "Enviar mensaje (⌘↵)" : "Send message (⌘↵)")
                 }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(nsColor: .controlBackgroundColor))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+            )
             
+            // Sub-barra informativa compacta
             HStack {
-                Text(loc.isSpanish ? "Pulsa ⌘ + Enter o el botón para enviar" : "Press ⌘ + Enter or button to send")
+                Text(loc.isSpanish ? "⌘ + Enter para enviar · Shift + Enter para salto de línea" : "⌘ + Enter to send · Shift + Enter for newline")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                 Spacer()
@@ -351,8 +492,11 @@ public struct ChatView: View {
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(.secondary)
             }
+            .padding(.horizontal, 4)
         }
-        .padding(12)
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
         .background(Color(nsColor: .windowBackgroundColor))
     }
     

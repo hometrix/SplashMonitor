@@ -5,6 +5,7 @@ import AppKit
 
 public struct MessageBubbleView: View {
     public let message: ChatMessage
+    @ObservedObject private var zoomManager = TextZoomManager.shared
     @State private var isThinkingExpanded: Bool = false
     @State private var copied: Bool = false
     
@@ -21,6 +22,11 @@ public struct MessageBubbleView: View {
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
+                // Adjuntos (si existen)
+                if !message.attachments.isEmpty {
+                    attachmentsPreview
+                }
+                
                 // Bloque de pensamiento colapsable (si existe)
                 if let thinking = message.thinkingContent, !thinking.isEmpty {
                     thinkingBlock(thinking)
@@ -46,6 +52,25 @@ public struct MessageBubbleView: View {
     }
     
     // MARK: - Avatar
+    
+    private var attachmentsPreview: some View {
+        HStack(spacing: 6) {
+            ForEach(message.attachments) { att in
+                HStack(spacing: 4) {
+                    Image(systemName: att.isImage ? "photo.fill" : "doc.text.fill")
+                        .font(.caption)
+                        .foregroundColor(.accentColor)
+                    Text(att.name)
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .cornerRadius(6)
+            }
+        }
+    }
     
     private var avatarView: some View {
         ZStack {
@@ -148,20 +173,34 @@ public struct MessageBubbleView: View {
     
     @ViewBuilder
     private func renderMarkdown(_ content: String) -> some View {
-        // Separación sencilla de bloques de código ``` y párrafos de texto
         let components = parseMarkdownComponents(content)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(components.indices, id: \.self) { idx in
                 let comp = components[idx]
                 if comp.isCodeBlock {
                     codeBlockView(code: comp.text, language: comp.language)
                 } else {
-                    Text(comp.text)
-                        .font(.system(size: 13))
-                        .foregroundColor(.primary)
-                        .textSelection(.enabled)
+                    formattedTextView(comp.text)
                 }
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func formattedTextView(_ rawText: String) -> some View {
+        let baseSize = NSFont.preferredFont(forTextStyle: .body).pointSize * zoomManager.zoomScale
+        if let attributed = try? AttributedString(markdown: rawText, options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+            Text(attributed)
+                .font(.system(size: baseSize))
+                .lineSpacing(4 * zoomManager.zoomScale)
+                .foregroundColor(.primary)
+                .textSelection(.enabled)
+        } else {
+            Text(rawText)
+                .font(.system(size: baseSize))
+                .lineSpacing(4 * zoomManager.zoomScale)
+                .foregroundColor(.primary)
+                .textSelection(.enabled)
         }
     }
     

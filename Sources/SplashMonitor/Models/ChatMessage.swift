@@ -8,11 +8,40 @@ public enum ChatRole: String, Codable, Sendable {
     case assistant
 }
 
+public struct ChatAttachment: Identifiable, Codable, Equatable, Sendable {
+    public let id: UUID
+    public let name: String
+    public let sizeBytes: Int64
+    public let isImage: Bool
+    public let mimeType: String
+    public let textContent: String?
+    public let base64Data: String?
+    
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        sizeBytes: Int64,
+        isImage: Bool,
+        mimeType: String,
+        textContent: String? = nil,
+        base64Data: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.sizeBytes = sizeBytes
+        self.isImage = isImage
+        self.mimeType = mimeType
+        self.textContent = textContent
+        self.base64Data = base64Data
+    }
+}
+
 public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
     public let id: UUID
     public let role: ChatRole
     public var content: String
     public var thinkingContent: String?
+    public var attachments: [ChatAttachment]
     public let timestamp: Date
     
     // Métricas en vivo del mensaje (telemetría por respuesta)
@@ -26,6 +55,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         role: ChatRole,
         content: String,
         thinkingContent: String? = nil,
+        attachments: [ChatAttachment] = [],
         timestamp: Date = Date(),
         tokensGenerated: Int? = nil,
         tokensPerSecond: Double? = nil,
@@ -36,6 +66,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable, Sendable {
         self.role = role
         self.content = content
         self.thinkingContent = thinkingContent
+        self.attachments = attachments
         self.timestamp = timestamp
         self.tokensGenerated = tokensGenerated
         self.tokensPerSecond = tokensPerSecond
