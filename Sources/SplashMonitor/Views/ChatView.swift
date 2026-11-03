@@ -10,6 +10,9 @@ public struct ChatView: View {
     @State private var inputText: String = ""
     @State private var showingSettingsSheet: Bool = false
     @State private var showingSessionList: Bool = true
+    @State private var editingSessionId: UUID?
+    @State private var editingTitleText: String = ""
+    @State private var exportSuccessToast: Bool = false
     
     public init(service: SplashService) {
         self.service = service
@@ -118,6 +121,18 @@ public struct ChatView: View {
             
             Spacer()
             
+            // Botón Exportar a Markdown
+            Button {
+                exportConversation()
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 12))
+                    .foregroundColor(exportSuccessToast ? .green : .secondary)
+            }
+            .buttonStyle(.plain)
+            .help(loc.isSpanish ? "Exportar conversación a Markdown (.md)" : "Export conversation to Markdown (.md)")
+            .disabled(chatService.currentSession?.messages.isEmpty ?? true)
+            
             // Botón Limpiar Conversación
             Button {
                 chatService.clearCurrentSession()
@@ -172,9 +187,18 @@ public struct ChatView: View {
                 ForEach(chatService.sessions) { session in
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(session.title)
-                                .font(.system(size: 12, weight: session.id == chatService.currentSessionId ? .semibold : .regular))
-                                .lineLimit(1)
+                            if editingSessionId == session.id {
+                                TextField("", text: $editingTitleText, onCommit: {
+                                    chatService.renameSession(id: session.id, newTitle: editingTitleText)
+                                    editingSessionId = nil
+                                })
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 11))
+                            } else {
+                                Text(session.title)
+                                    .font(.system(size: 12, weight: session.id == chatService.currentSessionId ? .semibold : .regular))
+                                    .lineLimit(1)
+                            }
                             Text("\(session.messages.count) \(loc.isSpanish ? "mensajes" : "messages")")
                                 .font(.system(size: 9))
                                 .foregroundColor(.secondary)
@@ -188,10 +212,21 @@ public struct ChatView: View {
                     }
                     .padding(.vertical, 3)
                     .contentShape(Rectangle())
-                    .onTapGesture {
-                        chatService.selectSession(id: session.id)
+                    .onTapGesture(count: 2) {
+                        editingSessionId = session.id
+                        editingTitleText = session.title
+                    }
+                    .onTapGesture(count: 1) {
+                        if editingSessionId == nil {
+                            chatService.selectSession(id: session.id)
+                        }
                     }
                     .contextMenu {
+                        Button(loc.isSpanish ? "Renombrar" : "Rename") {
+                            editingSessionId = session.id
+                            editingTitleText = session.title
+                        }
+                        Divider()
                         Button(loc.isSpanish ? "Eliminar" : "Delete", role: .destructive) {
                             chatService.deleteSession(id: session.id)
                         }
@@ -238,6 +273,36 @@ public struct ChatView: View {
     
     // MARK: - Barra de Entrada
     
+    private func handleSendMessage() {
+        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, service.isRunning, !chatService.isGenerating else { return }
+        let text = inputText
+        inputText = ""
+        chatService.sendMessage(
+            text,
+            port: service.activePort,
+            model: service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
+        )
+    }
+    
+    private func exportConversation() {
+        let md = chatService.exportCurrentSessionToMarkdown()
+        let savePanel = NSSavePanel()
+        savePanel.allowedContentTypes = [.plainText]
+        savePanel.nameFieldStringValue = "\(chatService.currentSession?.title ?? "conversation").md"
+        savePanel.canCreateDirectories = true
+        savePanel.isExtensionHidden = false
+        
+        savePanel.begin { result in
+            if result == .OK, let url = savePanel.url {
+                try? md.write(to: url, atomically: true, encoding: .utf8)
+                exportSuccessToast = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    exportSuccessToast = false
+                }
+            }
+        }
+    }
+    
     private var inputControlsBar: some View {
         VStack(spacing: 8) {
             HStack(alignment: .bottom, spacing: 8) {
@@ -264,26 +329,21 @@ public struct ChatView: View {
                     .help(loc.isSpanish ? "Detener generación" : "Stop generation")
                 } else {
                     Button {
-                        let text = inputText
-                        inputText = ""
-                        chatService.sendMessage(
-                            text,
-                            port: service.activePort,
-                            model: service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
-                        )
+                        handleSendMessage()
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 24))
                             .foregroundColor(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !service.isRunning ? .secondary.opacity(0.4) : .accentColor)
                     }
                     .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: [.command])
                     .disabled(inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !service.isRunning)
-                    .help(loc.isSpanish ? "Enviar mensaje" : "Send message")
+                    .help(loc.isSpanish ? "Enviar mensaje (⌘↵)" : "Send message (⌘↵)")
                 }
             }
             
             HStack {
-                Text(loc.isSpanish ? "Pulsa botón Enviar para consultar" : "Press send button to query")
+                Text(loc.isSpanish ? "Pulsa ⌘ + Enter o el botón para enviar" : "Press ⌘ + Enter or button to send")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                 Spacer()

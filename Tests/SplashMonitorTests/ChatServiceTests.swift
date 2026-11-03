@@ -45,5 +45,47 @@ final class ChatServiceTests: XCTestCase {
         service.deleteSession(id: sessionId)
         XCTAssertFalse(service.sessions.contains(where: { $0.id == sessionId }))
     }
+    
+    func testRenameSession() {
+        let service = ChatService.shared
+        service.createNewSession(modelId: "test-model", title: "Original Title")
+        guard let sessionId = service.currentSessionId else {
+            XCTFail("No session id")
+            return
+        }
+        
+        service.renameSession(id: sessionId, newTitle: "Renamed Title")
+        XCTAssertEqual(service.currentSession?.title, "Renamed Title")
+    }
+    
+    func testExportToMarkdown() {
+        let service = ChatService.shared
+        service.createNewSession(modelId: "qwen-35b", title: "Export Test")
+        guard let sessionId = service.currentSessionId else {
+            XCTFail("No session id")
+            return
+        }
+        
+        if let idx = service.sessions.firstIndex(where: { $0.id == sessionId }) {
+            service.sessions[idx].messages.append(ChatMessage(role: .user, content: "Hazme un hello world"))
+            service.sessions[idx].messages.append(ChatMessage(
+                role: .assistant,
+                content: "```python\nprint('Hello World')\n```",
+                thinkingContent: "Pensando cómo responder amablemente...",
+                tokensGenerated: 25,
+                tokensPerSecond: 95.4,
+                ttftMs: 120.0,
+                isComplete: true
+            ))
+        }
+        
+        let md = service.exportCurrentSessionToMarkdown()
+        XCTAssertTrue(md.contains("# Export Test"))
+        XCTAssertTrue(md.contains("qwen-35b"))
+        XCTAssertTrue(md.contains("Hazme un hello world"))
+        XCTAssertTrue(md.contains("Hello World"))
+        XCTAssertTrue(md.contains("Pensando cómo responder"))
+        XCTAssertTrue(md.contains("95.4 tok/s"))
+    }
 }
 

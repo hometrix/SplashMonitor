@@ -69,6 +69,49 @@ public final class ChatService: ObservableObject {
         saveSessionsToDisk()
     }
     
+    public func renameSession(id: UUID, newTitle: String) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        sessions[index].title = trimmed
+        sessions[index].updatedAt = Date()
+        saveSessionsToDisk()
+    }
+    
+    public func exportCurrentSessionToMarkdown() -> String {
+        guard let session = currentSession else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        
+        var md = "# \(session.title)\n\n"
+        md += "- **Model**: `\(session.modelId)`\n"
+        md += "- **Created**: \(formatter.string(from: session.createdAt))\n"
+        md += "- **Messages**: \(session.messages.count)\n\n---\n\n"
+        
+        for msg in session.messages {
+            let roleTitle = msg.role == .user ? "👤 User" : (msg.role == .assistant ? "🤖 Assistant (\(session.modelId))" : "⚙️ System")
+            md += "### \(roleTitle)\n\n"
+            
+            if let think = msg.thinkingContent, !think.isEmpty {
+                md += "<details>\n<summary>Thinking Process / Razonamiento</summary>\n\n"
+                md += "\(think)\n\n"
+                md += "</details>\n\n"
+            }
+            
+            md += "\(msg.content)\n\n"
+            
+            if let tokPerSec = msg.tokensPerSecond, tokPerSec > 0 {
+                md += "*Telemetry: \(String(format: "%.1f", tokPerSec)) tok/s"
+                if let ttft = msg.ttftMs {
+                    md += " · TTFT: \(String(format: "%.0f", ttft))ms"
+                }
+                md += "*\n\n"
+            }
+            md += "---\n\n"
+        }
+        return md
+    }
+    
     // MARK: - Streaming SSE (/v1/chat/completions)
     
     public func sendMessage(

@@ -5,6 +5,31 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.2.0-beta] - 2026-11-02
+
+Versión mayor destacada que transforma **Splash Monitor** en un **Estudio de Desarrollo y Chat Nativo Multi-Turn Completo** para macOS. Introduce soporte oficial para **Splash 1.5.0**, telemetría en tiempo real de razonamiento (`<think>`) y decodificación especulativa **DFlash2**, atajos de teclado profesionales y exportación de sesiones a Markdown.
+
+### 🚀 Novedades y Características
+
+- **💬 Módulo de Chat Nativo & Multi-Turn Playground:**
+  - Cliente streaming nativo SSE (`URLSession.bytes`) conectado directamente a `/v1/chat/completions`.
+  - Soporte de razonamiento profundo (`<think>`) con acordeón colapsable para modelos estilo DeepSeek R1 y Claude Opus.
+  - Bloques de código con detección sintáctica y botón de copia con 1 clic al portapapeles.
+  - Telemetría de inferencia por mensaje: cálculo exacto de tokens por segundo (`tok/s`), tiempo al primer token (`TTFT` en ms) y total de tokens generados.
+  - Gestión integral de conversaciones con persistencia en disco JSON (`~/Library/Application Support/SplashMonitor/chats/`).
+  - Atajo rápido `⌘ + Enter` para enviar mensajes y soporte de saltos de línea con `Shift + Enter`.
+  - Renombrado rápido de conversaciones con doble clic o menú contextual.
+  - **Exportación de chats a Markdown (.md)** con metadatos del modelo, razonamiento y telemetría de rendimiento.
+  - Panel deslizante de parámetros en caliente: Temperatura (0.0 a 1.5), Tokens máximos de salida (hasta 8k) y System Prompt personalizable.
+- **⚡ Compatibilidad Total con Splash 1.5.0 & Telemetría DFlash2:**
+  - Compatibilidad completa con la versión 1.5.0 de Splash.
+  - Visualización y diagnóstico de eficiencia de decodificación especulativa DFlash2 (detección de modelos con baja aceptación de draft tokens).
+  - Recomendaciones optimizadas para modelos fine-tuneados compatibles con arquitecturas MoE y MTP (`Qwen3.6-35B-A3B`).
+- **🛡️ Suite Completa de 125 Pruebas Unitarias Automatizadas (100% passing):**
+  - Incorporadas 5 pruebas unitarias exhaustivas para `ChatService` (creación, vaciado, borrado, renombrado y exportación a Markdown).
+
+---
+
 ## [1.1.0-beta] - 2026-10-27
 
 Versión menor destacada con **internacionalización bilingüe al 100% (Español / Inglés)**, monitor interactivo del **ciclo de vida de inferencia en tiempo real (PREFILL ➔ DECODE ➔ IDLE)** en el Dashboard, modalidad **multimodal por defecto (Visión + Texto)** con conmutación inteligente a `--language-only` para modelos de código, y notificaciones nativas de macOS. Resuelve los issues de la comunidad **#5** y **#6**.
