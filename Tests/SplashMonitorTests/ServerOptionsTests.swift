@@ -409,6 +409,48 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertTrue(cmd.contains("🎯 Verificación: Todas las filas (--verify-rows all)"), "El banner debe incluir la verificación: \(cmd)")
         XCTAssertTrue(cmd.contains("🧠 Memoria Expertos MoE: 12g"), "El banner debe incluir la memoria de expertos: \(cmd)")
     }
+    
+    func testServerLaunchFiltersOutFilePathsFromServedModelNameAliases() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        
+        // Simular modelos instalados que contienen rutas de archivo .gguf o delimitadores no válidos (Issue #8)
+        service.installedModels = [
+            InstalledSplashModel(
+                repoId: "/Users/test/.cache/huggingface/hub/models--ukisai--Swift/Swift-1.5-Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf",
+                localPath: URL(fileURLWithPath: "/tmp/fake.gguf"),
+                diskSizeBytes: 1024,
+                isCurrentlyActive: false
+            ),
+            InstalledSplashModel(
+                repoId: "valid-org/valid-model",
+                localPath: URL(fileURLWithPath: "/tmp/valid"),
+                diskSizeBytes: 1024,
+                isCurrentlyActive: false
+            ),
+            InstalledSplashModel(
+                repoId: "~/Desktop/some_model.gguf",
+                localPath: URL(fileURLWithPath: "/tmp/desk.gguf"),
+                diskSizeBytes: 1024,
+                isCurrentlyActive: false
+            )
+        ]
+        
+        service.startServer(model: "incoai/Qwen3.6-35B-A3B-Splash", port: testPort)
+        
+        guard let cmd = try await waitForCommand(capturedCommand) else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        // No debe contener rutas de archivo como alias de modelo
+        XCTAssertFalse(cmd.contains("--served-model-name \"/Users/"), "No debe inyectar rutas absolutas en --served-model-name: \(cmd)")
+        XCTAssertFalse(cmd.contains(".gguf\""), "No debe inyectar extensiones .gguf en --served-model-name: \(cmd)")
+        XCTAssertFalse(cmd.contains("--served-model-name \"~/"), "No debe inyectar rutas con tilde en --served-model-name: \(cmd)")
+        
+        // Pero sí debe incluir los modelos con alias válidos
+        XCTAssertTrue(cmd.contains("--served-model-name \"valid-org/valid-model\""), "Debe conservar modelos con formato de repo válido: \(cmd)")
+    }
 }
 
 /// Helper para capturar valores dentro de closures concurrentes en tests

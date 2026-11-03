@@ -35,3 +35,4 @@ public final class TextZoomManager: ObservableObject {
         "\(Int(round(zoomScale * 100)))%"
     }
 }
+

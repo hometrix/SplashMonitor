@@ -5,6 +5,33 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.2.1-beta] - 2026-11-03
+
+Versión de mantenimiento y refinamiento visual que resuelve los issues **#7** y **#8** de la comunidad, perfecciona el área de entrada del chat con envío nativo mediante `Enter`, control dinámico de zoom de fuentes e inserción de archivos adjuntos.
+
+### 🐛 Correcciones de Errores
+- **⌨️ Atajo de Salida Completa & Botón de Menú (Issue #7):**
+  - Se sustituyó `Cmd+Shift+Q` por `⌥⌘Q` (`Cmd+Option+Q`) para evitar colisiones con el atajo de cierre de sesión de macOS.
+  - Se agregó un botón visible y directo de **"Salir de Splash Monitor"** en el pie de la ventana de la barra de menú (`MenuBarView`).
+- **🛡️ Sanitización de Alias de Modelos (Issue #8):**
+  - Se filtran y descartan automáticamente rutas de disco (`/Users/...`, `~/...`, `.gguf`) y caracteres de delimitación en la bandera `--served-model-name`.
+  - Ahora Splash arranca limpiamente cuando el usuario especifica modelos locales mediante `--model-dir`, `--draft-model` y `--mmproj`.
+
+### 🚀 Novedades y Mejoras Visuales
+- **🔎 Menú de Apariencia y Controles de Zoom:**
+  - Menú nativo en **Ver > Apariencia** con atajos `⌘ +` (Zoom In), `⌘ -` (Zoom Out) y `⌘ 0` (Restablecer 100%), además de controles `[-] 100% [+]` en la cabecera del Chat.
+- **✨ Renderizado Markdown Limpio:**
+  - Negritas reales y tipografía dinámica de macOS sin mostrar asteriscos `**` literales.
+- **📏 Entrada de Texto Compacta y Envío con `Enter`:**
+  - Rediseño de la barra de escritura como cápsula horizontal contenida de 34px (eliminando el espacio negro vertical excesivo).
+  - Envío directo al presionar `Enter` (sin obligar a usar el ratón), y salto de línea con `Shift + Enter`.
+- **📎 Adjuntos de Archivos y Código:**
+  - Botón de clip para seleccionar código fuente o documentos para análisis, e imágenes multimodales con base64.
+- **🔄 Conmutador de Modelos en Caliente:**
+  - Menú desplegable en la cabecera del chat para alternar entre modelos locales al instante.
+
+---
+
 ## [1.2.0-beta] - 2026-11-02
 
 Versión mayor destacada que transforma **Splash Monitor** en un **Estudio de Desarrollo y Chat Nativo Multi-Turn Completo** para macOS. Introduce soporte oficial para **Splash 1.5.0**, telemetría en tiempo real de razonamiento (`<think>`) y decodificación especulativa **DFlash2**, atajos de teclado profesionales y exportación de sesiones a Markdown.

@@ -1812,7 +1812,27 @@ public class SplashService: ObservableObject {
             }
             
             let aliasFlags = allAliases
-                .filter { $0 != validatedModel }
+                .filter { alias in
+                    guard alias != validatedModel, !alias.isEmpty else { return false }
+                    // Splash CLI requiere: "model alias must be a non-empty name without whitespace or URL delimiters"
+                    // Descartar si contiene espacios en blanco
+                    if alias.rangeOfCharacter(from: .whitespacesAndNewlines) != nil { return false }
+                    // Descartar si es una ruta absoluta a un archivo de disco (/Users/...) o extensión de archivo (.gguf)
+                    if alias.hasPrefix("/") || alias.hasPrefix("~") || alias.hasSuffix(".gguf") || alias.hasSuffix(".bin") {
+                        return false
+                    }
+                    // Descartar delimitadores de URL prohibidos por Splash CLI: '?', '#', '@', '\\'
+                    let prohibitedDelimiters = CharacterSet(charactersIn: "?#@\\")
+                    if alias.rangeOfCharacter(from: prohibitedDelimiters) != nil { return false }
+                    // Si contiene '/', debe ser un identificador estándar de repo HuggingFace (exactamente un '/')
+                    if alias.contains("/") {
+                        let segments = alias.split(separator: "/")
+                        if segments.count != 2 || segments[0].isEmpty || segments[1].isEmpty {
+                            return false
+                        }
+                    }
+                    return true
+                }
                 .sorted()
                 .map { "--served-model-name \"\($0)\"" }
                 .joined(separator: " ")

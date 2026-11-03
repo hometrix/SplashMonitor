@@ -113,11 +113,42 @@ public struct ChatView: View {
                         .fill(service.isRunning ? Color.green : Color.orange)
                         .frame(width: 6, height: 6)
                     
-                    let activeName = service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
-                    Text(service.isRunning ? "\(activeName) (:\(service.activePort))" : (loc.isSpanish ? "Servidor Detenido" : "Server Stopped"))
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                    // Selector y cambiador rápido de modelos
+                    Menu {
+                        let models = service.installedModels.map { $0.repoId }
+                        let currentModel = service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
+                        
+                        Text(loc.isSpanish ? "Modelos Locales Disponibles:" : "Available Local Models:")
+                        Divider()
+                        
+                        ForEach(models, id: \.self) { modelId in
+                            Button {
+                                if modelId != currentModel {
+                                    service.switchModel(to: modelId)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(modelId)
+                                    if modelId == currentModel {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            let activeName = service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
+                            Text(service.isRunning ? "\(activeName) (:\(service.activePort))" : (loc.isSpanish ? "\(activeName) (Detenido)" : "\(activeName) (Stopped)"))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 8))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .menuStyle(.borderlessButton)
+                    .help(loc.isSpanish ? "Cambiar de modelo en caliente" : "Switch model on the fly")
                 }
             }
             
@@ -441,20 +472,23 @@ public struct ChatView: View {
                 .buttonStyle(.plain)
                 .help(loc.isSpanish ? "Adjuntar código, texto o imágenes para análisis" : "Attach code, text or images for analysis")
                 
-                // Campo de entrada
-                TextEditor(text: $inputText)
-                    .font(.body)
-                    .frame(minHeight: 24, maxHeight: 85)
-                    .padding(.horizontal, 4)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.clear)
+                // Campo de entrada nativo (Enter envía, Shift+Enter salto de línea, altura compacta)
+                let baseFontSize = NSFont.preferredFont(forTextStyle: .body).pointSize * zoomManager.zoomScale
+                MacChatInputField(
+                    text: $inputText,
+                    font: .systemFont(ofSize: baseFontSize),
+                    onCommit: {
+                        handleSendMessage()
+                    }
+                )
+                .frame(height: 34)
                 
                 if chatService.isGenerating {
                     Button {
                         chatService.cancelGeneration()
                     } label: {
                         Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 26))
+                            .font(.system(size: 24))
                             .foregroundColor(.red)
                     }
                     .buttonStyle(.plain)
@@ -464,27 +498,26 @@ public struct ChatView: View {
                         handleSendMessage()
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
-                            .font(.system(size: 26))
+                            .font(.system(size: 24))
                             .foregroundColor((inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty) || !service.isRunning ? .secondary.opacity(0.3) : .accentColor)
                     }
                     .buttonStyle(.plain)
-                    .keyboardShortcut(.return, modifiers: [.command])
                     .disabled((inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && pendingAttachments.isEmpty) || !service.isRunning)
-                    .help(loc.isSpanish ? "Enviar mensaje (⌘↵)" : "Send message (⌘↵)")
+                    .help(loc.isSpanish ? "Enviar mensaje (Enter)" : "Send message (Enter)")
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
             .background(Color(nsColor: .controlBackgroundColor))
-            .cornerRadius(12)
+            .cornerRadius(10)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
             )
             
             // Sub-barra informativa compacta
             HStack {
-                Text(loc.isSpanish ? "⌘ + Enter para enviar · Shift + Enter para salto de línea" : "⌘ + Enter to send · Shift + Enter for newline")
+                Text(loc.isSpanish ? "Enter para enviar · Shift + Enter para salto de línea" : "Enter to send · Shift + Enter for newline")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
                 Spacer()

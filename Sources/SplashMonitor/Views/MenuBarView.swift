@@ -299,6 +299,22 @@ public struct MenuBarView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.regular)
+            
+            // Botón Salir de Splash Monitor (Issue #7)
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                HStack {
+                    Image(systemName: "power")
+                        .foregroundColor(.red)
+                    Text(tr(es: "Salir de Splash Monitor", en: "Quit Splash Monitor"))
+                        .foregroundColor(.red)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
         }
     }
     

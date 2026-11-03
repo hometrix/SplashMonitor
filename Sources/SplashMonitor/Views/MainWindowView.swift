@@ -645,8 +645,8 @@ public struct MainWindowView: View {
                             Text(loc.isSpanish ? "Modo Solo Barra de Menú" : "Menu Bar Only Mode")
                                 .font(.system(size: 12))
                             Text(loc.isSpanish
-                                 ? "Cmd+Q oculta la app del Dock y del listado de tareas en lugar de cerrarla. Usa Cmd+Shift+Q para salir completamente."
-                                 : "Cmd+Q hides the app from the Dock and task list instead of quitting. Use Cmd+Shift+Q to quit completely.")
+                                 ? "Cmd+Q oculta la app del Dock y del listado de tareas en lugar de cerrarla. Usa ⌥⌘Q (Cmd+Option+Q) para salir completamente."
+                                 : "Cmd+Q hides the app from the Dock and task list instead of quitting. Use ⌥⌘Q (Cmd+Option+Q) to quit completely.")
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                         }

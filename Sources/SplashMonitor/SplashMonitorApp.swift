@@ -173,7 +173,7 @@ struct SplashMonitorApp: App {
                         appDelegate.isReallyQuitting = true
                         NSApp.terminate(nil)
                     }
-                    .keyboardShortcut("q", modifiers: [.command, .shift])
+                    .keyboardShortcut("q", modifiers: [.command, .option])
                 }
             }
         }
