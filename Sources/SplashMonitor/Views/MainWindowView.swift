@@ -15,6 +15,7 @@ public struct MainWindowView: View {
     
     public enum SidebarItem: String, CaseIterable, Identifiable {
         case dashboard
+        case chat
         case connectedApps
         case models
         case server
@@ -27,6 +28,7 @@ public struct MainWindowView: View {
         public func title(isSpanish: Bool) -> String {
             switch self {
             case .dashboard: return isSpanish ? "Dashboard de Tokens" : "Token Dashboard"
+            case .chat: return isSpanish ? "Chat con Modelo" : "Model Chat"
             case .connectedApps: return isSpanish ? "Apps Conectadas" : "Connected Apps"
             case .models: return isSpanish ? "Gestor de Modelos" : "Model Manager"
             case .server: return isSpanish ? "Servidor y Agentes" : "Server & Agents"
@@ -39,6 +41,7 @@ public struct MainWindowView: View {
         public var icon: String {
             switch self {
             case .dashboard: return "speedometer"
+            case .chat: return "bubble.left.and.bubble.right.fill"
             case .connectedApps: return "app.connected.to.app.below.fill"
             case .models: return "shippingbox"
             case .server: return "server.rack"
@@ -209,26 +212,32 @@ public struct MainWindowView: View {
                 }
                 
                 // Main Content View
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        switch selectedSidebarItem {
-                        case .dashboard:
-                            dashboardDetailView
-                        case .connectedApps:
-                            ConnectedAppsView(service: service)
-                        case .models:
-                            ModelManagerView(service: service)
-                        case .server:
-                            ServerControlView(service: service)
-                        case .modelTesting:
-                            ModelTestingView(service: service)
-                        case .settings:
-                            settingsDetailView
-                        case .about:
-                            AboutView()
+                if selectedSidebarItem == .chat {
+                    ChatView(service: service)
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            switch selectedSidebarItem {
+                            case .dashboard:
+                                dashboardDetailView
+                            case .chat:
+                                EmptyView()
+                            case .connectedApps:
+                                ConnectedAppsView(service: service)
+                            case .models:
+                                ModelManagerView(service: service)
+                            case .server:
+                                ServerControlView(service: service)
+                            case .modelTesting:
+                                ModelTestingView(service: service)
+                            case .settings:
+                                settingsDetailView
+                            case .about:
+                                AboutView()
+                            }
                         }
+                        .padding(24)
                     }
-                    .padding(24)
                 }
             }
             .frame(minWidth: 560, minHeight: 480)

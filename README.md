@@ -142,7 +142,13 @@ Cada módulo de **Splash Monitor** está optimizado para la experiencia nativa d
 
 <br/>
 
-#### 2. 📊 Dashboard de Tokens y Rendimiento Metal
+#### 2. 💬 Chat Profesional y Multi-Turn Playground
+<img src="screenshots/es/module-chat.png" width="850" alt="Chat Profesional de Modelos y Playground" />
+<p><b>Módulo de Chat Nativo de IA:</b> Interacción conversacional en streaming ultrarrápido (SSE con <code>AsyncSequence</code>), renderizado inteligente de Markdown con bloques de código y botón de copiado de un clic, proceso de pensamiento colapsable (<i>Thinking</i>), telemetría en tiempo real por token (<code>tok/s</code> y latencia TTFT), historial persistente de conversaciones en disco y selector interactivo de temperatura y tokens.</p>
+
+<br/>
+
+#### 3. 📊 Dashboard de Tokens y Rendimiento Metal
 <img src="screenshots/es/module-dashboard.png" width="850" alt="Dashboard de Tokens y Rendimiento Metal" />
 <p><b>Módulo de Rendimiento en Tiempo Real:</b> Monitorea velocidades de generación de tokens (DECODE y PREFILL en tok/s), ratio de acierto y reutilización de KV Cache, deduplicación de tokens, aceptación especulativa DFlash 2, latencias TTFT/ITL y uso de memoria unificada Metal (M3/M4/M5).</p>
 
@@ -591,7 +597,13 @@ Every module of **Splash Monitor** is designed and optimized for a native Apple 
 
 <br/>
 
-#### 2. 📊 Real-Time Token & Metal Performance Dashboard
+#### 2. 💬 Professional AI Chat & Multi-Turn Playground
+<img src="screenshots/en/module-chat.png" width="850" alt="Professional AI Chat and Multi-Turn Playground" />
+<p><b>Native AI Chat Module:</b> High-speed conversational streaming (SSE with <code>AsyncSequence</code>), rich Markdown rendering with syntax-aware code blocks and one-click copy, collapsible reasoning process (<i>Thinking</i> blocks), per-token live telemetry (<code>tok/s</code> and TTFT latency), persistent on-disk chat session history, and interactive temperature/token sliders.</p>
+
+<br/>
+
+#### 3. 📊 Real-Time Token & Metal Performance Dashboard
 <img src="screenshots/en/module-dashboard.png" width="850" alt="Real-Time Token & Metal Performance Dashboard" />
 <p><b>Real-Time Performance Module:</b> Live token generation speed telemetry (DECODE and PREFILL in tok/s), KV Cache hit ratio and token reuse, token deduplication metrics, DFlash 2 speculative decoding acceptance rates, TTFT/ITL latencies, and Apple Silicon Metal unified memory usage (M3/M4/M5).</p>
 
