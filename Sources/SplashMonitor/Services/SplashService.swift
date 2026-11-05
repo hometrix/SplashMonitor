@@ -103,6 +103,8 @@ public class SplashService: ObservableObject {
     @AppStorage("allowedOrigins") public var allowedOrigins: String = "*"
     @AppStorage("languageOnly") public var languageOnly: Bool = false
     @AppStorage("customServerFlags") public var customServerFlags: String = ""
+    /// JSON `{"<id de modelo>": "<flags>"}`; ver `PerModelServerFlags`.
+    @AppStorage("perModelServerFlags") public var perModelServerFlags: String = "{}"
     
     // Splash 1.3.2+ Settings
     @AppStorage("stateFormat") public var stateFormat: String = "fp32" // "fp32" | "bf16"
@@ -1156,13 +1158,7 @@ public class SplashService: ObservableObject {
         
         // Soporte y mapeo de Flash-Next: Splash 1.4.0 solo permite cargar Flash-Next desde GGUF con variante (e.g. :Q2_0).
         // Si el usuario solicita el repositorio base de pesos crudos 'Qwen/Qwen3.8-Flash-Next', mapear a la cuantización GGUF oficial.
-        let effectiveRepoId: String
-        let trimmedRepo = repoId.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedRepo.lowercased() == "qwen/qwen3.8-flash-next" || trimmedRepo.lowercased() == "qwen3.8-flash-next" {
-            effectiveRepoId = "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:Q2_0"
-        } else {
-            effectiveRepoId = trimmedRepo
-        }
+        let effectiveRepoId = ModelIDValidator.launchModelId(repoId)
         
         isInstalling = true
         isInstallCancelled = false
@@ -1668,6 +1664,16 @@ public class SplashService: ObservableObject {
         startServer(model: selectedModelForLaunch, port: newPort)
     }
     
+    /// Flags CLI adicionales guardados para `model`.
+    public func modelServerFlags(for model: String) -> String {
+        PerModelServerFlags.flags(for: model, in: perModelServerFlags)
+    }
+
+    /// Guarda los flags CLI de `model`; una cadena vacía borra la entrada.
+    public func setModelServerFlags(_ flags: String, for model: String) {
+        perModelServerFlags = PerModelServerFlags.setting(flags, for: model, in: perModelServerFlags)
+    }
+
     public func startServer(model: String, port: Int = 8000) {
         guard isSplashInstalled else {
             installSplashDependency()
@@ -1951,17 +1957,16 @@ public class SplashService: ObservableObject {
             if let err = customError {
                 print("⚠️ [SplashService] Flags CLI adicionales ignorados por seguridad: \(err)")
             }
-            let customFlagsString = customTokens.joined(separator: " ")
-            let customFlagsEcho = customTokens.isEmpty ? "" : "\necho \"🛠️ Flags CLI:  \(customFlagsString)\""
+            // Flags del modelo lanzado: se suman a los globales solo para este modelo.
+            let (modelTokens, modelError) = ServerCLIValidator.validateAndTokenize(modelServerFlags(for: validatedModel))
+            if let err = modelError {
+                print("⚠️ [SplashService] Flags CLI del modelo ignorados por seguridad: \(err)")
+            }
+            let customFlagsString = (customTokens + modelTokens).joined(separator: " ")
+            let customFlagsEcho = customFlagsString.isEmpty ? "" : "\necho \"🛠️ Flags CLI:  \(customFlagsString)\""
             
             let extraOptions = [hostFlag, allowedHostFlags, allowedOriginFlags, contextFlag, idleReleaseFlag, maxMemoryFlag, languageFlag, stateFormatFlag, thinkingBudgetFlag, persistentCacheFlag, verifyRowsFlag, expertMemoryFlag, customFlagsString].filter { !$0.isEmpty }.joined(separator: " ")
-            let trimmedStartModel = validatedModel.trimmingCharacters(in: .whitespacesAndNewlines)
-            let effectiveLaunchModel: String
-            if trimmedStartModel.lowercased() == "qwen/qwen3.8-flash-next" || trimmedStartModel.lowercased() == "qwen3.8-flash-next" {
-                effectiveLaunchModel = "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:Q2_0"
-            } else {
-                effectiveLaunchModel = trimmedStartModel
-            }
+            let effectiveLaunchModel = ModelIDValidator.launchModelId(validatedModel)
             let runCmd = "\"\(splashPath)\" serve --model \"\(effectiveLaunchModel)\" --port \"\(port)\" \(extraOptions) \(aliasFlags)"
             
             let hostLabel = self.listenOnAllInterfaces ? "0.0.0.0 (Toda la red local / LAN)" : "127.0.0.1 (Solo localhost)"

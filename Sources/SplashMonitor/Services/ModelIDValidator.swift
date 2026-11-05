@@ -61,6 +61,18 @@ public enum ModelIDValidator {
     }
 
     /// Recorta espacios y devuelve `nil` si el identificador no es válido.
+    /// Identificador con el que se lanza (e instala) un modelo.
+    /// Splash 1.4.0 solo carga Flash-Next desde GGUF con variante, así que el repositorio
+    /// base de pesos crudos 'Qwen/Qwen3.8-Flash-Next' se mapea a la cuantización GGUF oficial.
+    public static func launchModelId(_ raw: String) -> String {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = value.lowercased()
+        if lower == "qwen/qwen3.8-flash-next" || lower == "qwen3.8-flash-next" {
+            return "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF:Q2_0"
+        }
+        return value
+    }
+
     public static func normalized(_ raw: String) -> String? {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         return isValid(value) ? value : nil

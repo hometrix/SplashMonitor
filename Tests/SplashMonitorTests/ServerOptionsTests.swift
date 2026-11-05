@@ -285,6 +285,61 @@ final class ServerOptionsTests: XCTestCase {
         XCTAssertFalse(cmd.contains("--no-webui"), "Debe descartar toda la cadena de flags si contiene metacaracteres peligrosos: \(cmd)")
     }
     
+    func testServerLaunchAppendsPerModelFlagsForThatModel() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        let model = "incoai/Qwen3.6-35B-A3B-Splash"
+        service.customServerFlags = "--no-webui"
+        service.setModelServerFlags("--mmproj /tmp/mmproj.gguf", for: model)
+        defer {
+            service.customServerFlags = ""
+            service.setModelServerFlags("", for: model)
+        }
+        
+        service.startServer(model: model, port: testPort)
+        
+        guard let cmd = try await waitForCommand(capturedCommand) else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        XCTAssertTrue(cmd.contains("--no-webui --mmproj /tmp/mmproj.gguf"), "Los flags del modelo van tras los globales: \(cmd)")
+    }
+    
+    func testServerLaunchOmitsPerModelFlagsOfOtherModels() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        let other = "incoai/Qwen3.6-35B-A3B-Splash"
+        service.setModelServerFlags("--mmproj /tmp/mmproj.gguf", for: other)
+        defer { service.setModelServerFlags("", for: other) }
+        
+        service.startServer(model: "incoai/Qwen3.8-27B-Splash", port: testPort)
+        
+        guard let cmd = try await waitForCommand(capturedCommand) else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        XCTAssertFalse(cmd.contains("--mmproj"), "No debe aplicar flags de otro modelo: \(cmd)")
+    }
+    
+    func testServerLaunchSanitizesMaliciousPerModelFlags() async throws {
+        let dir = try TempDirectory()
+        let (service, capturedCommand) = makeService(directory: dir.url)
+        let model = "incoai/Qwen3.6-35B-A3B-Splash"
+        service.setModelServerFlags("--no-webui ; rm -rf /", for: model)
+        defer { service.setModelServerFlags("", for: model) }
+        
+        service.startServer(model: model, port: testPort)
+        
+        guard let cmd = try await waitForCommand(capturedCommand) else {
+            XCTFail("No command captured")
+            return
+        }
+        
+        XCTAssertFalse(cmd.contains("rm -rf"), "No debe inyectar comandos maliciosos: \(cmd)")
+    }
+    
     func testServerLaunchWithIdleReleaseAndMaxMemory() async throws {
         let dir = try TempDirectory()
         let (service, capturedCommand) = makeService(directory: dir.url)
