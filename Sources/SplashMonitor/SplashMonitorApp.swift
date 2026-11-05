@@ -141,7 +141,7 @@ struct SplashMonitorApp: App {
                     Button(loc.isSpanish ? "Aumentar tamaño de letra" : "Zoom In") {
                         TextZoomManager.shared.zoomIn()
                     }
-                    .keyboardShortcut("+", modifiers: .command)
+                    .keyboardShortcut("=", modifiers: .command)
                     
                     Button(loc.isSpanish ? "Reducir tamaño de letra" : "Zoom Out") {
                         TextZoomManager.shared.zoomOut()

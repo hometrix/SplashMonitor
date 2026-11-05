@@ -515,12 +515,55 @@ public struct ChatView: View {
                     .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
             )
             
-            // Sub-barra informativa compacta
-            HStack {
-                Text(loc.isSpanish ? "Enter para enviar · Shift + Enter para salto de línea" : "Enter to send · Shift + Enter for newline")
+            // Sub-barra informativa compacta con selector de modelo en la esquina inferior
+            HStack(spacing: 8) {
+                // Selector rápido de modelo abajo (Hot-Swap)
+                Menu {
+                    let models = service.installedModels.map { $0.repoId }
+                    let currentModel = service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel
+                    Text(loc.isSpanish ? "Modelos Locales Disponibles:" : "Available Local Models:")
+                    Divider()
+                    ForEach(models, id: \.self) { modelId in
+                        Button {
+                            if modelId != currentModel {
+                                service.switchModel(to: modelId)
+                            }
+                        } label: {
+                            HStack {
+                                Text(modelId)
+                                if modelId == currentModel {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(service.isRunning ? Color.green : Color.orange)
+                            .frame(width: 6, height: 6)
+                        let active = (service.activeModel.isEmpty ? service.selectedModelForLaunch : service.activeModel)
+                            .components(separatedBy: "/").last ?? ""
+                        Text(active.isEmpty ? (loc.isSpanish ? "Seleccionar Modelo" : "Select Model") : active)
+                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                            .lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 7))
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(nsColor: .controlBackgroundColor))
+                    .cornerRadius(4)
+                }
+                .menuStyle(.borderlessButton)
+                .help(loc.isSpanish ? "Cambiar de modelo activo (Hot-Swap)" : "Switch active model (Hot-Swap)")
+                
+                Text(loc.isSpanish ? "Enter para enviar · Shift + Enter salto" : "Enter to send · Shift + Enter newline")
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
+                
                 Spacer()
+                
                 Text("Temp: \(String(format: "%.1f", chatService.parameters.temperature)) · Max: \(chatService.parameters.maxTokens) tok")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(.secondary)
