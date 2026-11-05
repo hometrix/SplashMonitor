@@ -5,6 +5,33 @@ Todos los cambios notables de este proyecto serán documentados en este archivo.
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.2.2-beta] - 2026-11-05
+
+Versión que incorpora las mejoras y correcciones de la comunidad (#9, #10, #11) aportadas por @Thoralf-M, junto con el selector de modelos en caliente en la barra inferior del chat y el atajo nativo `⌘=` para zoom de visualización.
+
+### 🐛 Correcciones de Errores
+- **🖥️ Estabilidad del Popover en macOS 27 (Issue #9, PR #12 por @Thoralf-M):**
+  - Se asignó una altura fija de 460 pt en el `ScrollView` de `MenuBarView` para evitar que `MenuBarExtra` colapse a 0 pt en macOS 27.2.
+  - Se amplió el ancho del popover a 600 pt para evitar el recorte horizontal de los controles del servidor.
+  - Se ajustó el límite vertical del catálogo interno de modelos a 380 pt.
+- **🛡️ Protección de Procesos Externos al Salir (Issue #11, PR #14 por @Thoralf-M):**
+  - Nuevo módulo `ServerOwnership` que verifica la genealogía de procesos del motor Splash en ejecución.
+  - Al cerrar Splash Monitor, la app solo detiene los servidores que ella misma inició; las instancias lanzadas desde la Terminal permanecen activas sin interrupción.
+
+### 🚀 Novedades y Mejoras
+- **⚙️ Flags CLI por Modelo (Issue #10, PR #13 por @Thoralf-M):**
+  - Nuevo módulo `PerModelServerFlags` que almacena y asocia argumentos CLI específicos a cada identificador de modelo en `model-flags.json`.
+  - Permite configurar banderas avanzadas (`--model-dir`, `--draft-model`, `--mmproj`, etc.) sin afectar ni romper otros modelos locales.
+- **🔄 Selector Rápido de Modelo Abajo (Hot-Swap en Chat):**
+  - Incorporada una píldora con indicador en vivo (🟢 activo / 🟠 detenido) en la esquina inferior izquierda de la barra de chat.
+  - Permite alternar de modelo local al instante deteniendo limpiamente el anterior y levantando el nuevo automáticamente.
+- **🔍 Atajo Universal de Zoom `⌘=` (Estilo VS Code / macOS):**
+  - Se agregó soporte para `⌘=` (además de `⌘+`), `⌘-` y `⌘0` bajo el menú nativo *Visualización > Apariencia*.
+- **🧪 Cobertura de Pruebas:**
+  - 142/142 pruebas unitarias pasando al 100% (+16 tests nuevos cubriendo ownership y flags por modelo).
+
+---
+
 ## [1.2.1-beta] - 2026-11-03
 
 Versión de mantenimiento y refinamiento visual que resuelve los issues **#7** y **#8** de la comunidad, perfecciona el área de entrada del chat con envío nativo mediante `Enter`, control dinámico de zoom de fuentes e inserción de archivos adjuntos.
