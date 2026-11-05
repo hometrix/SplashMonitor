@@ -1484,6 +1484,34 @@ public class SplashService: ObservableObject {
     /// `pkill -INT -f "splash serve"`, que alcanza cualquier proceso cuya línea de
     /// comandos contenga esa cadena, y después aplicaba `SIGKILL` a todo lo que
     /// `lsof -ti :<puerto>` devolviese, incluidos los clientes conectados.
+    /// Lock del motor del puerto activo (no el `serve.lock` compartido por todos los motores).
+    private var activePortLockURL: URL {
+        runtimeDirectory.appendingPathComponent("serve-\(activePort).lock")
+    }
+    
+    /// PID del motor activo leído del lock en este momento; `activePid` solo se refresca al
+    /// sondear y sigue vacío durante el primer segundo tras arrancar.
+    private var currentEnginePid: Int? {
+        if let lock = ServeLockStore.decode(try? Data(contentsOf: activePortLockURL)), lock.pid > 0 {
+            return lock.pid
+        }
+        return activePid
+    }
+    
+    /// Al salir solo se detiene el motor que arrancó esta app (ver `ServerOwnership`).
+    public var shouldStopServerOnQuit: Bool {
+        guard let pid = currentEnginePid else { return false }
+        let script = dataDirectory.appendingPathComponent("start_splash.command").path
+        return ServerOwnership.isLaunchedByApp(pid: pid, scriptPath: script, process: ServerOwnership.psInfo)
+    }
+    
+    /// Detiene solo el motor activo: los motores de otros puertos y sus locks no se tocan.
+    public func stopActiveServerSync() {
+        guard let pid = currentEnginePid else { return }
+        terminator.stopEngineSynchronously(port: activePort, candidatePids: [Int32(pid)])
+        try? FileManager.default.removeItem(at: activePortLockURL)
+    }
+    
     public func stopServerSync() {
         terminator.stopEngineSynchronously(port: activePort, candidatePids: candidateStopPIDs())
         for url in lockFileURLs(port: activePort) where FileManager.default.fileExists(atPath: url.path) {

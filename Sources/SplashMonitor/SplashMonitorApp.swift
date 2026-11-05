@@ -82,9 +82,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        // Kill splash server and release all memory
+        // Stop the server only if this app started it; one launched from a terminal
+        // or script keeps running. Always release memory.
         let service = SplashService.shared
-        service.stopServerSync()
+        if service.shouldStopServerOnQuit {
+            service.stopActiveServerSync()
+        }
         service.resetState()
     }
     
