@@ -37,6 +37,25 @@ public struct ServerControlView: View {
         let (_, err) = ServerCLIValidator.validateAndTokenize(service.customServerFlags)
         return err
     }
+
+    /// Modelo que se lanzaría con la selección actual.
+    private var launchTargetModel: String {
+        isCustomModel ? customModelText.trimmingCharacters(in: .whitespacesAndNewlines) : service.selectedModelForLaunch
+    }
+
+    /// Flags CLI guardados para el modelo seleccionado.
+    private var modelFlagsBinding: Binding<String> {
+        Binding(
+            get: { service.modelServerFlags(for: launchTargetModel) },
+            set: { service.setModelServerFlags($0, for: launchTargetModel) }
+        )
+    }
+
+    /// Error de validación de los flags CLI del modelo seleccionado.
+    private var modelFlagsError: String? {
+        let (_, err) = ServerCLIValidator.validateAndTokenize(service.modelServerFlags(for: launchTargetModel))
+        return err
+    }
     
     public var body: some View {
         VStack(spacing: 12) {
@@ -765,7 +784,7 @@ public struct ServerControlView: View {
                             .buttonStyle(.borderedProminent)
                             .tint(.purple)
                             .controlSize(.regular)
-                            .disabled(targetModel.isEmpty || customModelError != nil || customFlagsError != nil)
+                            .disabled(targetModel.isEmpty || customModelError != nil || customFlagsError != nil || modelFlagsError != nil)
                             .fixedSize()
                         }
                     } else {
@@ -779,7 +798,7 @@ public struct ServerControlView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(.green)
                         .controlSize(.regular)
-                        .disabled(targetModel.isEmpty || customFlagsError != nil)
+                        .disabled(targetModel.isEmpty || customFlagsError != nil || modelFlagsError != nil)
                         .fixedSize()
                     }
                 }
@@ -965,7 +984,7 @@ public struct ServerControlView: View {
                     Image(systemName: "terminal")
                         .font(.system(size: 9))
                         .foregroundColor(.secondary)
-                    Text(tr(es: "Flags CLI adicionales:", en: "Additional CLI flags:"))
+                    Text(tr(es: "Flags CLI adicionales (todos los modelos):", en: "Additional CLI flags (all models):"))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
                     Spacer()
@@ -986,6 +1005,44 @@ public struct ServerControlView: View {
                 .help(tr(
                     es: "Flags y opciones adicionales que se pasan directamente al final del comando 'splash serve'.",
                     en: "Additional flags and options passed directly at the end of the 'splash serve' command."
+                ))
+            }
+            .padding(.top, 2)
+            
+            // Flags CLI del modelo seleccionado (ej. --model-dir, --mmproj, --draft-model)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    Image(systemName: "shippingbox")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                    Text(tr(es: "Flags CLI de este modelo:", en: "CLI flags for this model:"))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Text(launchTargetModel)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    if let err = modelFlagsError {
+                        Text(err)
+                            .font(.system(size: 9))
+                            .foregroundColor(.red)
+                            .lineLimit(1)
+                    }
+                }
+                
+                TextField(
+                    tr(es: "Ej: --model-dir /ruta/modelo.gguf --mmproj /ruta/mmproj.gguf", en: "e.g. --model-dir /path/model.gguf --mmproj /path/mmproj.gguf"),
+                    text: modelFlagsBinding
+                )
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 10, design: .monospaced))
+                // Sin id válido los flags quedarían guardados bajo un id a medio escribir.
+                .disabled(launchTargetModel.isEmpty || customModelError != nil)
+                .help(tr(
+                    es: "Se añaden después de los flags globales y solo al lanzar este modelo.",
+                    en: "Appended after the global flags, only when launching this model."
                 ))
             }
             .padding(.top, 2)

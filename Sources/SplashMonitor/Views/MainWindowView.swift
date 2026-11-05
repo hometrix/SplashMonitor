@@ -970,7 +970,7 @@ public struct MainWindowView: View {
                 Divider()
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(loc.isSpanish ? "Flags CLI Adicionales de Splash:" : "Additional Splash CLI Flags:")
+                    Text(loc.isSpanish ? "Flags CLI Adicionales de Splash (todos los modelos):" : "Additional Splash CLI Flags (all models):")
                         .font(.system(size: 11, weight: .medium))
                     
                     TextField(loc.isSpanish ? "ej. --no-webui --max-cache-disk 50GB" : "e.g. --no-webui --max-cache-disk 50GB", text: $service.customServerFlags)
@@ -978,8 +978,8 @@ public struct MainWindowView: View {
                         .font(.system(size: 11, design: .monospaced))
                     
                     Text(loc.isSpanish
-                         ? "Parámetros y banderas arbitrarias adicionales que se pasarán al final de 'splash serve'. Se sanean automáticamente para evitar inyección de comandos."
-                         : "Arbitrary additional flags passed directly to 'splash serve'. Automatically sanitized to prevent command injection.")
+                         ? "Parámetros y banderas arbitrarias adicionales que se pasarán al final de 'splash serve' para todos los modelos. Los flags de un solo modelo se configuran en Servidor. Se sanean automáticamente para evitar inyección de comandos."
+                         : "Arbitrary additional flags passed to 'splash serve' for every model. Flags for a single model are set in Server. Automatically sanitized to prevent command injection.")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
