@@ -206,7 +206,7 @@ public struct ModelManagerView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 200)
+                .frame(maxHeight: 380)
             }
         }
     }
@@ -320,7 +320,7 @@ public struct ModelManagerView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 200)
+                .frame(maxHeight: 380)
             }
         }
     }

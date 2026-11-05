@@ -81,7 +81,9 @@ public struct MenuBarView: View {
                 }
                 .padding(14)
             }
-            .frame(maxHeight: 460)
+            // Fixed height: the MenuBarExtra window can size itself from a zero-height
+            // proposal, and a ScrollView with only maxHeight then collapses to 0 pt.
+            .frame(height: 460)
             
             Divider()
             
@@ -91,7 +93,8 @@ public struct MenuBarView: View {
                 .padding(.vertical, 8)
                 .background(Color(nsColor: .windowBackgroundColor).opacity(0.6))
         }
-        .frame(width: 440)
+        // ServerControlView needs ~572 pt; at 440 its rows overflow and get clipped on both sides.
+        .frame(width: 600)
     }
     
     // MARK: - Header
