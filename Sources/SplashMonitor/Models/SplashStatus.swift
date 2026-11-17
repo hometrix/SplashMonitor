@@ -23,6 +23,9 @@ public struct SplashStatus: Codable {
     public let streaming: StreamingStatus?
     public let kvSpill: KvSpillStatus?
     public let verificationMode: String?
+    // Splash 1.7.0 Telemetry
+    public let disk: DiskMetrics?
+    public let reasoningEffort: String?
     
     enum CodingKeys: String, CodingKey {
         case ready
@@ -44,6 +47,8 @@ public struct SplashStatus: Codable {
         case streaming
         case kvSpill = "kv_spill"
         case verificationMode = "verification_mode"
+        case disk
+        case reasoningEffort = "reasoning_effort"
     }
 }
 
@@ -263,6 +268,34 @@ public struct KvSpillStatus: Codable {
         case spilledTokens = "spilled_tokens"
         case spilledBytes = "spilled_bytes"
         case hotTokens = "hot_tokens"
+    }
+}
+
+// MARK: - Splash 1.7.0 Disk Metrics
+
+public struct DiskMetrics: Codable {
+    public let capacityBytes: Int64?
+    public let limitBytes: Int64?
+    public let usedBytes: Int64?
+    public let volumeAvailableBytes: Int64?
+    public let writeBudgetBytes: Int64?
+    public let readBytes: Int64?
+    public let writtenBytes: Int64?
+    public let writtenLastHourBytes: Int64?
+    public let writtenLastDayBytes: Int64?
+    public let writesGated: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case capacityBytes = "capacity_bytes"
+        case limitBytes = "limit_bytes"
+        case usedBytes = "used_bytes"
+        case volumeAvailableBytes = "volume_available_bytes"
+        case writeBudgetBytes = "write_budget_bytes"
+        case readBytes = "read_bytes"
+        case writtenBytes = "written_bytes"
+        case writtenLastHourBytes = "written_last_hour_bytes"
+        case writtenLastDayBytes = "written_last_day_bytes"
+        case writesGated = "writes_gated"
     }
 }
 
